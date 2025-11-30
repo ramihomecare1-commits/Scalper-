@@ -3,11 +3,12 @@ services:
   - type: worker
     name: scalper-bot
     env: python
+    runtime: python
     buildCommand: pip install -r requirements.txt
     startCommand: python bot.py
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.0
+        value: 3.11.9
       - key: ENV
         sync: false
       - key: DEBUG
