@@ -137,21 +137,23 @@ class ScalpingBot:
         await self.ws.close()
         log.info("Bot stopped")
 
-# Global instance for signal handling
-bot = ScalpingBot()
-
-def handle_shutdown(signum, frame):
-    log.info("Shutdown signal received")
-    asyncio.create_task(bot.stop())
-    sys.exit(0)
 
 if __name__ == "__main__":
+    # Create bot instance only when running directly
+    bot_instance = ScalpingBot()
+    
+    def handle_shutdown(signum, frame):
+        log.info("Shutdown signal received")
+        asyncio.create_task(bot_instance.stop())
+        sys.exit(0)
+    
     signal.signal(signal.SIGINT, handle_shutdown)
     signal.signal(signal.SIGTERM, handle_shutdown)
     
     try:
-        asyncio.run(bot.start())
+        asyncio.run(bot_instance.start())
     except KeyboardInterrupt:
         pass
     except Exception as e:
         log.critical(f"Fatal error: {e}")
+

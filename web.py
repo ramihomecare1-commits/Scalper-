@@ -12,13 +12,20 @@ bot_thread = None
 def run_bot():
     """Run the bot in a separate thread"""
     global bot
-    bot = ScalpingBot()
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
     try:
+        log.info("Starting bot initialization...")
+        bot = ScalpingBot()
+        log.info("Bot initialized successfully")
+        
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        log.info("Event loop created, starting bot...")
+        
         loop.run_until_complete(bot.start())
     except Exception as e:
+        import traceback
         log.error(f"Bot error: {e}")
+        log.error(f"Traceback: {traceback.format_exc()}")
 
 @app.route('/')
 def home():
