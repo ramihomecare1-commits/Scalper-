@@ -1,4 +1,3 @@
-import pandas as pd
 import json
 from typing import Dict, List
 from utils.logger import log
@@ -22,17 +21,23 @@ class PerformanceTracker:
             if not trades:
                 return {"total_trades": 0}
 
-            df = pd.DataFrame(trades)
+            # Simple stats without pandas
+            symbols = list(set(t['symbol'] for t in trades if 'symbol' in t))
+            actions = {}
+            confidences = []
             
-            # This is a simplified view. Real PnL requires tracking exits.
-            # Assuming we have 'pnl' field if we updated logs after close, 
-            # or we just track number of entries for now.
+            for t in trades:
+                action = t.get('action')
+                if action:
+                    actions[action] = actions.get(action, 0) + 1
+                if 'confidence' in t:
+                    confidences.append(t['confidence'])
             
             stats = {
-                "total_trades": len(df),
-                "symbols": df['symbol'].unique().tolist(),
-                "actions": df['action'].value_counts().to_dict(),
-                "avg_confidence": df['confidence'].mean() if 'confidence' in df else 0
+                "total_trades": len(trades),
+                "symbols": symbols,
+                "actions": actions,
+                "avg_confidence": sum(confidences) / len(confidences) if confidences else 0
             }
             
             return stats

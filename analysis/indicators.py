@@ -1,80 +1,101 @@
-import pandas as pd
 import numpy as np
-import ta
-from typing import Dict, Optional
+from typing import Dict, List
 from utils.logger import log
 
 class TechnicalIndicators:
     @staticmethod
-    def add_all_indicators(df: pd.DataFrame) -> pd.DataFrame:
-        """Add all technical indicators to the dataframe"""
-        if df.empty:
-            return df
-            
-        try:
-            df = df.copy()
-            
-            # RSI (14 period)
-            df['rsi'] = ta.momentum.RSIIndicator(close=df['close'], window=14).rsi()
-            
-            # Bollinger Bands (20 period, 2 std dev)
-            bb = ta.volatility.BollingerBands(close=df['close'], window=20, window_dev=2)
-            df['bb_high'] = bb.bollinger_hband()
-            df['bb_low'] = bb.bollinger_lband()
-            df['bb_mid'] = bb.bollinger_mavg()
-            df['bb_width'] = (df['bb_high'] - df['bb_low']) / df['bb_mid']
-            
-            # Moving Averages
-            df['sma_5'] = ta.trend.SMAIndicator(close=df['close'], window=5).sma_indicator()
-            df['sma_10'] = ta.trend.SMAIndicator(close=df['close'], window=10).sma_indicator()
-            df['ema_9'] = ta.trend.EMAIndicator(close=df['close'], window=9).ema_indicator()
-            
-            # VWAP (Volume Weighted Average Price)
-            # Note: Standard VWAP resets daily. Here we calculate a rolling VWAP for simplicity 
-            # or use the library's implementation if available. 
-            # ta library vwap is often cumulative. Let's use a rolling approximation for scalping context
-            # or standard calculation: cumsum(v*p) / cumsum(v)
-            
-            # Using a rolling 24h (approx 1440 mins) or session based VWAP is common.
-            # For scalping, we might care about the session VWAP.
-            # Let's implement a simple rolling VWAP for the window size
-            v = df['volume'].values
-            tp = (df['high'] + df['low'] + df['close']) / 3
-            df['vwap'] = (tp * v).cumsum() / v.cumsum()
-            
-            return df
-            
-        except Exception as e:
-            log.error(f"Error calculating indicators: {e}")
-            return df
+    def calculate_rsi(prices: np.ndarray, period: int = 14) -> float:
+        """Calculate RSI using numpy"""
+        if len(prices) < period + 1:
+            return 50.0
+        
+        deltas = np.diff(prices)
+        gains = np.where(deltas > 0, deltas, 0)
+        losses = np.where(deltas < 0, -deltas, 0)
+        
+        avg_gain = np.mean(gains[-period:])
+        avg_loss = np.mean(losses[-period:])
+        
+        if avg_loss == 0:
+            return 100.0
+        
+        rs = avg_gain / avg_loss
+        rsi = 100 - (100 / (1 + rs))
+        return float(rsi)
 
     @staticmethod
-    def get_latest_indicators(df: pd.DataFrame) -> Dict:
-        """Get the latest indicator values"""
-        if df.empty:
-            return {}
-            
-        try:
-            last_row = df.iloc[-1]
-            return {
-                "rsi": float(last_row.get('rsi', 50)),
-                "bb_position": TechnicalIndicators._get_bb_position(last_row),
-                "trend_5_10": "UP" if last_row.get('sma_5', 0) > last_row.get('sma_10', 0) else "DOWN",
-                "vwap_dist": (float(last_row['close']) - float(last_row.get('vwap', last_row['close']))) / float(last_row['close']) * 100
-            }
-        except Exception as e:
-            log.error(f"Error getting latest indicators: {e}")
-            return {}
+    def calculate_sma(prices: np.ndarray, period: int) -> float:
+        """Calculate Simple Moving Average"""
+        if len(prices) < period:
+            return float(prices[-1]) if len(prices) > 0 else 0.0
+        return float(np.mean(prices[-period:]))
 
     @staticmethod
-    def _get_bb_position(row) -> str:
+    def calculate_bollinger_bands(prices: np.ndarray, period: int = 20, std_dev: int = 2) -> Dict:
+        """Calculate Bollinger Bands"""
+        if len(prices) < period:
+            return {"upper": 0, "middle": 0, "lower": 0}
+        
+        sma = np.mean(prices[-period:])
+        std = np.std(prices[-period:])
+        
+        return {
+            "upper": float(sma + (std_dev * std)),
+            "middle": float(sma),
+            "lower": float(sma - (std_dev * std))
+        }
+
+    @staticmethod
+    def calculate_vwap(prices: np.ndarray, volumes: np.ndarray) -> float:
+        """Calculate VWAP"""
+        if len(prices) == 0 or len(volumes) == 0:
+            return 0.0
+        
+        return float(np.sum(prices * volumes) / np.sum(volumes))
+
+    @staticmethod
+    def analyze_candles(candles: List[Dict]) -> Dict:
+        """Analyze candles and return indicators"""
+        if not candles or len(candles) < 20:
+            return {}
+        
+        closes = np.array([c['close'] for c in candles])
+        volumes = np.array([c['volume'] for c in candles])
+        highs = np.array([c['high'] for c in candles])
+        lows = np.array([c['low'] for c in candles])
+        
+        # Calculate typical price for VWAP
+        typical_prices = (highs + lows + closes) / 3
+        
+        rsi = TechnicalIndicators.calculate_rsi(closes)
+        sma_5 = TechnicalIndicators.calculate_sma(closes, 5)
+        sma_10 = TechnicalIndicators.calculate_sma(closes, 10)
+        bb = TechnicalIndicators.calculate_bollinger_bands(closes)
+        vwap = TechnicalIndicators.calculate_vwap(typical_prices, volumes)
+        
+        current_price = float(closes[-1])
+        
+        return {
+            "rsi": rsi,
+            "sma_5": sma_5,
+            "sma_10": sma_10,
+            "trend": "UP" if sma_5 > sma_10 else "DOWN",
+            "bb_upper": bb["upper"],
+            "bb_middle": bb["middle"],
+            "bb_lower": bb["lower"],
+            "bb_position": TechnicalIndicators._get_bb_position(current_price, bb),
+            "vwap": vwap,
+            "vwap_dist": ((current_price - vwap) / current_price * 100) if vwap > 0 else 0
+        }
+
+    @staticmethod
+    def _get_bb_position(price: float, bb: Dict) -> str:
         """Determine price position relative to Bollinger Bands"""
-        close = row['close']
-        if close > row['bb_high']:
+        if price > bb["upper"]:
             return "ABOVE_UPPER"
-        elif close < row['bb_low']:
+        elif price < bb["lower"]:
             return "BELOW_LOWER"
-        elif close > row['bb_mid']:
+        elif price > bb["middle"]:
             return "UPPER_HALF"
         else:
             return "LOWER_HALF"

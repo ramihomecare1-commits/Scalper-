@@ -1,5 +1,4 @@
 from typing import Dict, List, Optional
-import pandas as pd
 from collections import deque
 from config import Config
 from utils.logger import log
@@ -32,12 +31,6 @@ class MultiTimeframeManager:
         if not candle:
             return
 
-        # Only add confirmed candles to history, or update the last one if it's the same timestamp
-        # For simplicity in this rolling window, we'll append confirmed ones.
-        # Real-time updates might need handling unconfirmed candles separately.
-        # Here we assume we receive updates. If 'confirmed' is True, we finalize it.
-        
-        # Logic: If last candle in deque has same timestamp, replace it. Else append.
         dq = self.data[symbol][timeframe]
         
         if len(dq) > 0 and dq[-1]['timestamp'] == candle['timestamp']:
@@ -56,7 +49,7 @@ class MultiTimeframeManager:
     def get_consolidated_state(self, symbol: str) -> Dict:
         """
         Get consolidated state for AI analysis
-        Returns a dictionary containing dataframes for all timeframes + current market state
+        Returns a dictionary containing lists of candles for all timeframes + current market state
         """
         if symbol not in self.data:
             return {}
@@ -72,11 +65,7 @@ class MultiTimeframeManager:
 
         for tf in self.timeframes:
             candles_list = list(self.data[symbol][tf])
-            if candles_list:
-                df = DataProcessor.create_dataframe(candles_list)
-                state["candles"][tf] = df
-            else:
-                state["candles"][tf] = pd.DataFrame()
+            state["candles"][tf] = candles_list
 
         return state
 

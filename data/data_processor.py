@@ -1,5 +1,3 @@
-import pandas as pd
-import numpy as np
 from typing import Dict, List, Optional
 from datetime import datetime
 from utils.logger import log
@@ -60,15 +58,3 @@ class DataProcessor:
         except Exception as e:
             log.error(f"Error normalizing orderbook: {e}")
             return {}
-
-    @staticmethod
-    def create_dataframe(candles: List[Dict]) -> pd.DataFrame:
-        """Convert list of normalized candles to DataFrame"""
-        if not candles:
-            return pd.DataFrame()
-            
-        df = pd.DataFrame(candles)
-        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-        df.set_index('timestamp', inplace=True)
-        df.sort_index(inplace=True)
-        return df

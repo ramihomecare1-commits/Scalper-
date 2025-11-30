@@ -102,18 +102,20 @@ class ScalpingBot:
                 for symbol in self.symbols:
                     # 1. Check if data is ready
                     if not self.mtf_manager.is_ready(symbol):
-                        # log.debug(f"Waiting for data: {symbol}")
                         continue
 
                     # 2. Get Consolidated State
                     state = self.mtf_manager.get_consolidated_state(symbol)
                     
-                    # 3. Add Indicators
-                    for tf, df in state['candles'].items():
-                        state['candles'][tf] = TechnicalIndicators.add_all_indicators(df)
+                    # 3. Add Indicators for each timeframe
+                    indicators_by_tf = {}
+                    for tf, candles in state['candles'].items():
+                        indicators_by_tf[tf] = TechnicalIndicators.analyze_candles(candles)
+                    
+                    state['indicators'] = indicators_by_tf
                     
                     # 4. Analyze Orderbook
-                    state['market_data']['orderbook'] = OrderBookAnalyzer.analyze(state['market_data']['orderbook'])
+                    state['market_data']['orderbook_analysis'] = OrderBookAnalyzer.analyze(state['market_data']['orderbook'])
 
                     # 5. AI Decision
                     decision = await self.decision_engine.evaluate_market(symbol, state)
