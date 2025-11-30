@@ -37,25 +37,28 @@ class OrderExecutor:
                 log.warning("Trade rejected by risk manager")
                 return False
 
-            # 4. Place Order
-            # For scalping, we often use 'cross' or 'isolated'. Let's assume 'cross' for now or config.
-            # OKX requires size in contracts for swaps usually, or coin for spot.
-            # Assuming USDT Swaps for leverage.
-            # IMPORTANT: OKX API 'sz' for swaps is in number of contracts (usually 1 contract = X amount).
-            # We need to convert quantity to contracts. 
-            # For simplicity in this demo, we'll assume we are trading Spot or calculating correctly.
-            # Let's assume Spot for simplicity of 'sz' being in base currency, but user asked for leverage.
-            # If leverage, we likely trade SWAP. 
-            # TODO: Implement contract size conversion. For now, passing calculated quantity (might need adjustment).
-            
-            # Rounding quantity to appropriate precision (simplified)
-            sz = f"{quantity:.8f}" # Adjust precision based on instrument
+            # 4. Set Leverage (for SWAP contracts)
+            if Config.TRADING_MODE == "SWAP":
+                self._set_leverage(symbol, Config.LEVERAGE)
 
+            # 5. Place Order
+            # For SWAP contracts, size is in number of contracts
+            # 1 contract = 1 USD for BTC-USDT-SWAP, ETH-USDT-SWAP
+            # So we need to convert our quantity to contracts
+            
+            # For USDT-margined swaps: contracts = notional_value / contract_value
+            # Contract value is typically 1 USD per contract
+            notional_value = quantity * entry_price
+            sz = str(int(notional_value))  # Number of contracts
+            
             side = "buy" if action == "BUY" else "sell"
+            
+            # Use 'cross' margin mode for SWAP
+            td_mode = "cross" if Config.TRADING_MODE == "SWAP" else "cash"
             
             result = self.client.place_order(
                 instId=symbol,
-                tdMode="cross", # Using cross margin
+                tdMode=td_mode,
                 side=side,
                 ordType="limit",
                 sz=sz,
@@ -65,7 +68,7 @@ class OrderExecutor:
             )
 
             if result.get("code") == "0":
-                log.info(f"Trade executed: {action} {symbol} @ {entry_price}, Qty: {sz}, SL: {stop_loss}, TP: {take_profit}")
+                log.info(f"Trade executed: {action} {symbol} @ {entry_price}, Qty: {sz} contracts, SL: {stop_loss}, TP: {take_profit}")
                 return True
             
             return False
@@ -74,7 +77,24 @@ class OrderExecutor:
             log.error(f"Error executing signal: {e}")
             return False
 
-    def close_position(self, symbol: str) -> bool:
-        """Close all positions for a symbol"""
-        # Implementation would involve getting positions and placing market close orders
-        pass
+    def _set_leverage(self, inst_id: str, leverage: int):
+        """Set leverage for a trading pair"""
+        try:
+            if Config.DRY_RUN:
+                log.info(f"DRY RUN: Would set leverage to {leverage}x for {inst_id}")
+                return
+            
+            # OKX API to set leverage
+            result = self.client.accountAPI.set_leverage(
+                instId=inst_id,
+                lever=str(leverage),
+                mgnMode="cross"
+            )
+            
+            if result.get("code") == "0":
+                log.info(f"Leverage set to {leverage}x for {inst_id}")
+            else:
+                log.warning(f"Failed to set leverage: {result}")
+                
+        except Exception as e:
+            log.error(f"Error setting leverage: {e}")

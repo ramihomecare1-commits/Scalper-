@@ -23,8 +23,11 @@ class Config:
     DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat") # or specific R1 model name if available via API
     
     # Trading Configuration
-    TRADING_PAIRS = os.getenv("TRADING_PAIRS", "BTC-USDT,ETH-USDT").split(",")
+    TRADING_PAIRS = os.getenv("TRADING_PAIRS", "BTC-USDT-SWAP,ETH-USDT-SWAP").split(",")
     TIMEFRAMES = ["1m", "5m", "10m", "1H"]
+    
+    # Trading Mode: SPOT or SWAP (perpetual futures)
+    TRADING_MODE = os.getenv("TRADING_MODE", "SWAP")  # SWAP for leverage, SPOT for no leverage
     
     # Risk Management
     LEVERAGE = int(os.getenv("LEVERAGE", "3"))
