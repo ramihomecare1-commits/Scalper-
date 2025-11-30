@@ -31,16 +31,34 @@ class OKXClient:
             flag
         )
 
-    def get_balance(self, ccy: str = "USDT") -> float:
+    def get_balance(self, currency: str = "USDT") -> float:
         """Get account balance for a specific currency"""
         try:
-            result = self.accountAPI.get_account_balance(ccy=ccy)
-            if result.get("code") == "0" and result.get("data"):
-                return float(result["data"][0]["details"][0]["eq"])
-            log.error(f"Error getting balance: {result}")
+            if Config.DRY_RUN:
+                log.info(f"DRY RUN: Simulating balance of 10000 {currency}")
+                return 10000.0
+            
+            # Get account balance
+            result = self.accountAPI.get_account_balance(ccy=currency)
+            
+            if result and result.get("code") == "0":
+                data = result.get("data", [])
+                if data and len(data) > 0:
+                    details = data[0].get("details", [])
+                    for detail in details:
+                        if detail.get("ccy") == currency:
+                            # Get available balance
+                            avail_bal = detail.get("availBal", "0")
+                            return float(avail_bal)
+            
+            log.warning(f"Could not get balance for {currency}, defaulting to 0")
             return 0.0
+            
         except Exception as e:
             log.error(f"Exception getting balance: {e}")
+            # In DRY_RUN mode, return simulated balance even on error
+            if Config.DRY_RUN:
+                return 10000.0
             return 0.0
 
     def place_order(self, instId: str, tdMode: str, side: str, ordType: str, sz: str, px: Optional[str] = None, slTriggerPx: Optional[str] = None, tpTriggerPx: Optional[str] = None) -> Dict:
@@ -59,8 +77,39 @@ class OKXClient:
             if px:
                 args["px"] = px
             
-            # Attach SL/TP if provided (for OCO or simple attach depending on mode)
-            # OKX allows attaching SL/TP to order placement
+            # Attach SL/TP if provided
+            if slTriggerPx:
+                args["slTriggerPx"] = slTriggerPx
+                args["slOrdPx"] = "-1"  # Market order for SL
+            
+            if tpTriggerPx:
+                args["tpTriggerPx"] = tpTriggerPx
+                args["tpOrdPx"] = "-1"  # Market order for TP
+
+            log.info(f"Placing order: {args}")
+            
+            if Config.DRY_RUN:
+                log.info("DRY RUN: Order not placed")
+                return {"code": "0", "data": [{"ordId": "dry_run_id"}]}
+
+            result = self.tradeAPI.place_order(**args)
+            
+            if result.get("code") == "0":
+                log.info(f"Order placed successfully: {result['data'][0]['ordId']}")
+                return result
+            else:
+                log.error(f"Order placement failed: {result}")
+                return result
+
+        except Exception as e:
+            log.error(f"Exception placing order: {e}")
+            return {"code": "-1", "msg": str(e)}
+
+    def cancel_order(self, instId: str, ordId: str) -> bool:
+        """Cancel an order"""
+        try:
+            if Config.DRY_RUN:
+                log.info(f"DRY RUN: Cancel order {ordId}")
                 return True
 
             result = self.tradeAPI.cancel_order(instId=instId, ordId=ordId)
