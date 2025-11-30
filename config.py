@@ -20,7 +20,8 @@ class Config:
     
     # DeepSeek / AI Configuration
     DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
-    DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat") # or specific R1 model name if available via API
+    # For OpenRouter, use: deepseek/deepseek-chat or deepseek/deepseek-r1
+    DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek/deepseek-chat")
     
     # Telegram Notifications
     TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")

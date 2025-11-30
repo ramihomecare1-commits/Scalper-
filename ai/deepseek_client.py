@@ -8,7 +8,8 @@ class DeepSeekClient:
     def __init__(self):
         self.api_key = Config.DEEPSEEK_API_KEY
         self.model = Config.DEEPSEEK_MODEL
-        self.base_url = "https://api.deepseek.com/v1"
+        # Use OpenRouter endpoint instead of DeepSeek direct
+        self.base_url = "https://openrouter.ai/api/v1"
 
     async def analyze_market(self, prompt: str) -> Optional[Dict]:
         """
