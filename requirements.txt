@@ -1,28 +1,25 @@
-# Build dependencies
-setuptools>=65.0.0
-wheel
-
-# Core dependencies - all have pre-compiled wheels
+# Core dependencies - Python 3.13 compatible
 python-dotenv==1.0.0
 loguru==0.7.2
 
-# Data processing - use older numpy with guaranteed wheels for Python 3.11
-numpy==1.24.3
+# Data processing - Python 3.13 compatible
+numpy==2.0.2
 
 # OKX SDK
 python-okx==0.4.0
 
-# WebSocket and HTTP - all pure Python or have wheels
+# WebSocket and HTTP
 websockets==12.0
 requests==2.31.0
 aiohttp==3.9.1
 
-# AI/ML - use older version with better wheel support
-openai==1.3.0
+# AI/ML - Python 3.13 compatible
+openai==1.54.0
 
-# Web service wrapper - both have wheels
+# Web service wrapper
 Flask==3.0.0
 gunicorn==21.2.0
+
 
 
 
