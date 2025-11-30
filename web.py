@@ -50,13 +50,15 @@ def stats():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# Start bot thread when module is loaded (works with gunicorn)
+log.info("Initializing bot thread...")
+bot_thread = threading.Thread(target=run_bot, daemon=True)
+bot_thread.start()
+log.info("Bot thread started")
+
 if __name__ == '__main__':
-    # Start bot in background thread
-    bot_thread = threading.Thread(target=run_bot, daemon=True)
-    bot_thread.start()
-    log.info("Bot thread started")
-    
-    # Start Flask web server for Render
+    # This block only runs when executing directly with python web.py
     import os
     port = int(os.getenv('PORT', 10000))
     app.run(host='0.0.0.0', port=port)
+
