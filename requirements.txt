@@ -25,3 +25,8 @@ asyncio==3.4.3
 # Testing
 pytest==7.4.3
 pytest-asyncio==0.21.1
+
+# Web service wrapper for Render free tier
+Flask==3.0.0
+gunicorn==21.2.0
+
