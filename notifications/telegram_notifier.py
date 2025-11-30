@@ -46,7 +46,8 @@ class TelegramNotifier:
         try:
             side_emoji = "📈" if trade_data['action'] == 'BUY' else "📉"
             
-            message = f"""🚀 <b>TRADE OPENED</b>
+            message = f"""🤖 <b>SCALPER BOT</b>
+🚀 <b>TRADE OPENED</b>
 
 <b>Pair:</b> {trade_data['symbol']}
 <b>Side:</b> {trade_data['action']} {side_emoji}
@@ -83,7 +84,8 @@ class TelegramNotifier:
                 status_emoji = "⚪"
                 status_text = "BREAKEVEN"
             
-            message = f"""{status_emoji} <b>TRADE CLOSED - {status_text}</b>
+            message = f"""🤖 <b>SCALPER BOT</b>
+{status_emoji} <b>TRADE CLOSED - {status_text}</b>
 
 <b>Pair:</b> {trade_data['symbol']}
 <b>Side:</b> {trade_data['action']}
@@ -104,7 +106,8 @@ class TelegramNotifier:
     
     async def notify_error(self, error_message: str) -> bool:
         """Send error notification"""
-        message = f"""⚠️ <b>BOT ERROR</b>
+        message = f"""🤖 <b>SCALPER BOT</b>
+⚠️ <b>BOT ERROR</b>
 
 {error_message}
 """

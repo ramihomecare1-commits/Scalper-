@@ -33,7 +33,7 @@ class ScalpingBot:
         log.info("Fetching initial candle data via REST API...")
         for symbol in self.symbols:
             for tf in Config.TIMEFRAMES:
-                candles = rest_client.get_candles(symbol, bar=tf, limit=100)
+                candles = rest_client.get_candles(symbol, bar=tf, limit=300)
                 if candles:
                     # Populate the multi-timeframe manager with historical data
                     for candle_data in candles:
