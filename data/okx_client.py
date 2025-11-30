@@ -125,18 +125,23 @@ class OKXClient:
     def get_positions(self, instType: str = "SWAP") -> list:
         """Get current positions"""
         try:
+            # In SPOT mode, positions work differently - return empty for now
+            if Config.TRADING_MODE == "SPOT":
+                log.debug("SPOT mode - positions not tracked via this endpoint")
+                return []
+            
             if Config.DRY_RUN:
                 log.debug(f"DRY RUN: Returning empty positions list")
                 return []
             
             result = self.accountAPI.get_positions(instType=instType)
             
-            if result and result.get("code") == "0":
+            if result and isinstance(result, dict) and result.get("code") == "0":
                 positions = result.get("data", [])
                 log.debug(f"Retrieved {len(positions)} positions from OKX")
                 return positions
             
-            log.warning(f"Could not get positions: {result}")
+            log.warning(f"Could not get positions, returning empty list")
             return []
             
         except Exception as e:
