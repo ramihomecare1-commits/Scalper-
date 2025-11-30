@@ -5,6 +5,9 @@ loguru==0.7.2
 # Data processing - pure Python, no compilation
 numpy==1.26.4
 
+# OKX SDK
+python-okx==1.2.0
+
 # WebSocket and HTTP
 websockets==12.0
 requests==2.31.0
