@@ -25,31 +25,50 @@ class ScalpingBot:
         self.running = True
         log.info("Starting AI Scalping Bot...")
         
-        # 1. Connect to WebSocket
+        # Import REST client
+        from data.okx_rest_client import OKXMarketData
+        rest_client = OKXMarketData()
+        
+        # 1. Fetch initial historical candle data via REST API
+        log.info("Fetching initial candle data via REST API...")
+        for symbol in self.symbols:
+            for tf in Config.TIMEFRAMES:
+                candles = rest_client.get_candles(symbol, bar=tf, limit=100)
+                if candles:
+                    # Populate the multi-timeframe manager with historical data
+                    for candle_data in candles:
+                        # Convert to OKX WebSocket format
+                        candle_list = [
+                            str(candle_data['timestamp']),
+                            str(candle_data['open']),
+                            str(candle_data['high']),
+                            str(candle_data['low']),
+                            str(candle_data['close']),
+                            str(candle_data['volume']),
+                            "0", "0", "1"  # volCcy, volCcyQuote, confirm
+                        ]
+                        self.mtf_manager.update_candle(symbol, tf, candle_list)
+                    log.info(f"Loaded {len(candles)} historical candles for {symbol} ({tf})")
+        
+        # 2. Connect to WebSocket for real-time updates
         await self.ws.connect()
         
-        # 2. Subscribe to channels
+        # 3. Subscribe to real-time channels (order book and ticker only, no candles)
         channels = []
         for symbol in self.symbols:
-            # Candles for all timeframes
-            for tf in Config.TIMEFRAMES:
-                channels.append({"channel": f"candle{tf}", "instId": symbol})
-            
-            # Orderbook (Books-5 is lighter, Books-l2-tgn is full)
-            # Using books5 for speed/simplicity in this demo, or books for full depth
+            # Order book for support/resistance analysis
             channels.append({"channel": "books5", "instId": symbol})
             
-            # Ticker
+            # Ticker for current price
             channels.append({"channel": "tickers", "instId": symbol})
 
         await self.ws.subscribe(channels)
         
-        # 3. Register callbacks
-        self.ws.add_callback("candle", None, self._handle_candle)
+        # 4. Register callbacks for real-time data
         self.ws.add_callback("books5", None, self._handle_orderbook)
         self.ws.add_callback("tickers", None, self._handle_ticker)
 
-        # 4. Main Loop
+        # 5. Main Loop
         await self._main_loop()
 
     async def _handle_candle(self, msg: dict):
