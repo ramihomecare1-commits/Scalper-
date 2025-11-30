@@ -7,24 +7,6 @@ from utils.logger import log
 from data.okx_websocket import OKXWebSocket
 from data.multi_timeframe_manager import MultiTimeframeManager
 from analysis.indicators import TechnicalIndicators
-from analysis.orderbook_analyzer import OrderBookAnalyzer
-from ai.decision_engine import DecisionEngine
-from trading.order_executor import OrderExecutor
-
-class ScalpingBot:
-    def __init__(self):
-        self.running = False
-        self.ws = OKXWebSocket()
-        self.mtf_manager = MultiTimeframeManager()
-        self.decision_engine = DecisionEngine()
-        self.executor = OrderExecutor()
-        self.symbols = Config.TRADING_PAIRS
-
-    async def start(self):
-        """Start the bot"""
-        self.running = True
-        log.info("Starting AI Scalping Bot...")
-        
         # Import REST client
         from data.okx_rest_client import OKXMarketData
         rest_client = OKXMarketData()
@@ -125,33 +107,60 @@ class ScalpingBot:
 
     async def _main_loop(self):
         """Main analysis loop"""
+        import time
+        last_position_check = 0
+        
         while self.running:
             try:
+                current_time = time.time()
+                
+                # Periodically check existing positions (every 5 minutes)
+                if current_time - last_position_check > self.position_check_interval:
+                    await self._update_active_positions()
+                    last_position_check = current_time
+                
                 for symbol in self.symbols:
                     # 1. Check if data is ready
                     if not self.mtf_manager.is_ready(symbol):
                         continue
+                    
+                    # 2. Skip if we already have an open position for this symbol
+                    if symbol in self.active_positions:
+                        log.debug(f"Skipping {symbol} - already have open position")
+                        continue
+                    
+                    # 3. Check cooldown - don't trade same symbol within 5 minutes
+                    if symbol in self.last_trade_time:
+                        time_since_last_trade = current_time - self.last_trade_time[symbol]
+                        if time_since_last_trade < 300:  # 5 minutes cooldown
+                            continue
 
-                    # 2. Get Consolidated State
+                    # 4. Get Consolidated State
                     state = self.mtf_manager.get_consolidated_state(symbol)
                     
-                    # 3. Add Indicators for each timeframe
+                    # 5. Add Indicators for each timeframe
                     indicators_by_tf = {}
                     for tf, candles in state['candles'].items():
                         indicators_by_tf[tf] = TechnicalIndicators.analyze_candles(candles)
                     
                     state['indicators'] = indicators_by_tf
                     
-                    # 4. Analyze Orderbook
+                    # 6. Analyze Orderbook
                     state['market_data']['orderbook_analysis'] = OrderBookAnalyzer.analyze(state['market_data']['orderbook'])
 
-                    # 5. AI Decision
+                    # 7. AI Decision
                     decision = await self.decision_engine.evaluate_market(symbol, state)
                     
                     if decision:
                         log.info(f"AI Signal: {decision}")
-                        # 6. Execute Trade (await the async version)
-                        await self.executor.execute_signal_async(decision, state)
+                        # 8. Execute Trade (await the async version)
+                        success = await self.executor.execute_signal_async(decision, state)
+                        
+                        if success:
+                            # Mark position as active and record trade time
+                            self.active_positions.add(symbol)
+                            self.last_trade_time[symbol] = current_time
+                            log.info(f"Added {symbol} to active positions")
 
                 await asyncio.sleep(1) # 1 second loop
 
@@ -168,6 +177,29 @@ class ScalpingBot:
                     pass  # Don't let notification errors crash the bot
                 
                 await asyncio.sleep(5)
+    
+    async def _update_active_positions(self):
+        """Check OKX for current open positions and update tracking"""
+        try:
+            log.info("Checking for open positions...")
+            positions = self.executor.client.get_positions(instType=Config.TRADING_MODE)
+            
+            # Clear and rebuild active positions set
+            self.active_positions.clear()
+            
+            for pos in positions:
+                inst_id = pos.get('instId')
+                pos_size = float(pos.get('pos', 0))
+                
+                # If position size is not zero, it's an active position
+                if pos_size != 0:
+                    self.active_positions.add(inst_id)
+                    log.info(f"Active position found: {inst_id}, Size: {pos_size}")
+            
+            log.info(f"Total active positions: {len(self.active_positions)}")
+            
+        except Exception as e:
+            log.error(f"Error checking positions: {e}")
 
     async def stop(self):
         """Stop the bot"""
