@@ -31,7 +31,25 @@ class OKXWebSocket:
             asyncio.create_task(self._ping_loop())
             
         except Exception as e:
-            log.error(f"WebSocket connection failed: {e}")
+            error_msg = f"WebSocket connection failed: {e}"
+            log.error(error_msg)
+            
+            # Send Telegram notification for connection errors
+            try:
+                import aiohttp
+                from config import Config
+                if hasattr(Config, 'TELEGRAM_BOT_TOKEN') and Config.TELEGRAM_BOT_TOKEN:
+                    url = f"https://api.telegram.org/bot{Config.TELEGRAM_BOT_TOKEN}/sendMessage"
+                    payload = {
+                        "chat_id": Config.TELEGRAM_CHAT_ID,
+                        "text": f"🤖 <b>SCALPER BOT</b>\n⚠️ <b>CONNECTION ERROR</b>\n\n{error_msg}",
+                        "parse_mode": "HTML"
+                    }
+                    async with aiohttp.ClientSession() as session:
+                        await session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=5))
+            except:
+                pass
+            
             await self._reconnect()
 
     async def _reconnect(self):

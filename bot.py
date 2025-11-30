@@ -88,7 +88,16 @@ class ScalpingBot:
                     self.mtf_manager.update_candle(symbol, timeframe, candle)
                     
         except Exception as e:
-            log.error(f"Error handling candle: {e}")
+            error_msg = f"Error handling candle: {e}"
+            log.error(error_msg)
+            
+            # Send Telegram notification for data errors
+            try:
+                from notifications.telegram_notifier import TelegramNotifier
+                notifier = TelegramNotifier()
+                await notifier.notify_error(f"Candle data error: {str(e)}")
+            except:
+                pass
 
     async def _handle_orderbook(self, msg: dict):
         """Handle orderbook data"""
@@ -147,7 +156,17 @@ class ScalpingBot:
                 await asyncio.sleep(1) # 1 second loop
 
             except Exception as e:
-                log.error(f"Error in main loop: {e}")
+                error_msg = f"Error in main loop: {e}"
+                log.error(error_msg)
+                
+                # Send Telegram notification for critical errors
+                try:
+                    from notifications.telegram_notifier import TelegramNotifier
+                    notifier = TelegramNotifier()
+                    await notifier.notify_error(f"Main loop error: {str(e)}")
+                except:
+                    pass  # Don't let notification errors crash the bot
+                
                 await asyncio.sleep(5)
 
     async def stop(self):
