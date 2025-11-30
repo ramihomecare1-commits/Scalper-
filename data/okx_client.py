@@ -122,13 +122,23 @@ class OKXClient:
             log.error(f"Exception cancelling order: {e}")
             return False
 
-    def get_positions(self, instType: str = "SWAP") -> Dict:
+    def get_positions(self, instType: str = "SWAP") -> list:
         """Get current positions"""
         try:
+            if Config.DRY_RUN:
+                log.debug(f"DRY RUN: Returning empty positions list")
+                return []
+            
             result = self.accountAPI.get_positions(instType=instType)
-            if result.get("code") == "0":
-                return result.get("data", [])
+            
+            if result and result.get("code") == "0":
+                positions = result.get("data", [])
+                log.debug(f"Retrieved {len(positions)} positions from OKX")
+                return positions
+            
+            log.warning(f"Could not get positions: {result}")
             return []
+            
         except Exception as e:
             log.error(f"Exception getting positions: {e}")
             return []
