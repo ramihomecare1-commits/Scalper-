@@ -7,6 +7,29 @@ from utils.logger import log
 from data.okx_websocket import OKXWebSocket
 from data.multi_timeframe_manager import MultiTimeframeManager
 from analysis.indicators import TechnicalIndicators
+from analysis.orderbook_analyzer import OrderBookAnalyzer
+from ai.decision_engine import DecisionEngine
+from trading.order_executor import OrderExecutor
+
+class ScalpingBot:
+    def __init__(self):
+        self.running = False
+        self.ws = OKXWebSocket()
+        self.mtf_manager = MultiTimeframeManager()
+        self.decision_engine = DecisionEngine()
+        self.executor = OrderExecutor()
+        self.symbols = Config.TRADING_PAIRS
+        
+        # Track active positions to prevent duplicate trades
+        self.active_positions = set()  # Set of symbols with open positions
+        self.last_trade_time = {}  # Track when we last traded each symbol
+        self.position_check_interval = 300  # Check positions every 5 minutes
+
+    async def start(self):
+        """Start the bot"""
+        self.running = True
+        log.info("Starting AI Scalping Bot...")
+        
         # Import REST client
         from data.okx_rest_client import OKXMarketData
         rest_client = OKXMarketData()
