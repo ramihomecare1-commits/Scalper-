@@ -150,8 +150,8 @@ class ScalpingBot:
                     
                     if decision:
                         log.info(f"AI Signal: {decision}")
-                        # 6. Execute Trade
-                        self.executor.execute_signal(decision, state)
+                        # 6. Execute Trade (await the async version)
+                        await self.executor.execute_signal_async(decision, state)
 
                 await asyncio.sleep(1) # 1 second loop
 

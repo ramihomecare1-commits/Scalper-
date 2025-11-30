@@ -101,11 +101,20 @@ class OrderExecutor:
         Synchronous wrapper for execute_signal_async
         """
         try:
+            # Get the current event loop
             loop = asyncio.get_event_loop()
-            return loop.run_until_complete(self.execute_signal_async(signal, market_data))
-        except:
-            # Fallback if no event loop
-            return asyncio.run(self.execute_signal_async(signal, market_data))
+            if loop.is_running():
+                # If loop is already running, create a task
+                task = asyncio.create_task(self.execute_signal_async(signal, market_data))
+                # We can't wait for it in sync context, so return True optimistically
+                # The actual result will be logged by the async function
+                return True
+            else:
+                # If no loop is running, run it
+                return loop.run_until_complete(self.execute_signal_async(signal, market_data))
+        except Exception as e:
+            log.error(f"Error in execute_signal wrapper: {e}")
+            return False
 
     async def close_position_async(self, order_id: str, exit_price: float, pnl: float, pnl_percent: float):
         """Notify when a position is closed"""
