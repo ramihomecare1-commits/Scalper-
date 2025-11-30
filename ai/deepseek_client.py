@@ -6,16 +6,34 @@ from utils.logger import log
 
 class DeepSeekClient:
     def __init__(self):
-        self.client = AsyncOpenAI(
-            api_key=Config.DEEPSEEK_API_KEY,
-            base_url="https://api.deepseek.com/v1" # Standard DeepSeek API endpoint
-        )
+        self.client = None
         self.model = Config.DEEPSEEK_MODEL
+
+    def _ensure_client(self):
+        """Lazy initialization of the client"""
+        if self.client is None:
+            if not Config.DEEPSEEK_API_KEY:
+                log.warning("DEEPSEEK_API_KEY not set - AI features will be disabled")
+                return False
+            
+            try:
+                self.client = AsyncOpenAI(
+                    api_key=Config.DEEPSEEK_API_KEY,
+                    base_url="https://api.deepseek.com/v1"
+                )
+            except Exception as e:
+                log.error(f"Failed to initialize DeepSeek client: {e}")
+                return False
+        return True
 
     async def analyze_market(self, prompt: str) -> Optional[Dict]:
         """
         Send market data to DeepSeek R1 for analysis
         """
+        if not self._ensure_client():
+            log.warning("DeepSeek client not available - skipping AI analysis")
+            return None
+            
         try:
             log.info("Sending analysis request to DeepSeek AI...")
             
@@ -25,7 +43,7 @@ class DeepSeekClient:
                     {"role": "system", "content": self._get_system_prompt()},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.1, # Low temperature for consistent, logical output
+                temperature=0.1,
                 max_tokens=1000,
                 response_format={"type": "json_object"}
             )

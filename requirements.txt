@@ -14,7 +14,7 @@ requests==2.31.0
 aiohttp==3.9.1
 
 # AI/ML
-openai==1.6.1
+openai==1.58.1
 
 # Web service wrapper for Render free tier
 Flask==3.0.0
