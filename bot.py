@@ -25,7 +25,7 @@ class ScalpingBot:
         self.last_trade_time = {}  # Track when we last traded each symbol
         self.last_ai_analysis = {}  # Track when we last analyzed each symbol with AI
         self.position_check_interval = 300  # Check positions every 5 minutes
-        self.ai_analysis_cooldown = 60  # Only analyze with AI every 60 seconds per symbol
+        self.ai_analysis_cooldown = 300  # Only analyze with AI every 5 minutes per symbol
 
     async def start(self):
         """Start the bot"""
