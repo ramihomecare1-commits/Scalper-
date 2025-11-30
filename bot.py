@@ -23,7 +23,9 @@ class ScalpingBot:
         # Track active positions to prevent duplicate trades
         self.active_positions = set()  # Set of symbols with open positions
         self.last_trade_time = {}  # Track when we last traded each symbol
+        self.last_ai_analysis = {}  # Track when we last analyzed each symbol with AI
         self.position_check_interval = 300  # Check positions every 5 minutes
+        self.ai_analysis_cooldown = 60  # Only analyze with AI every 60 seconds per symbol
 
     async def start(self):
         """Start the bot"""
@@ -171,12 +173,19 @@ class ScalpingBot:
                     # 6. Analyze Orderbook
                     state['market_data']['orderbook_analysis'] = OrderBookAnalyzer.analyze(state['market_data']['orderbook'])
 
-                    # 7. AI Decision
+                    # 7. Check AI analysis cooldown - don't spam AI every second
+                    if symbol in self.last_ai_analysis:
+                        time_since_last_analysis = current_time - self.last_ai_analysis[symbol]
+                        if time_since_last_analysis < self.ai_analysis_cooldown:
+                            continue  # Skip AI analysis, wait for cooldown
+                    
+                    # 8. AI Decision
                     decision = await self.decision_engine.evaluate_market(symbol, state)
+                    self.last_ai_analysis[symbol] = current_time  # Update last analysis time
                     
                     if decision:
                         log.info(f"AI Signal: {decision}")
-                        # 8. Execute Trade (await the async version)
+                        # 9. Execute Trade (await the async version)
                         success = await self.executor.execute_signal_async(decision, state)
                         
                         if success:
