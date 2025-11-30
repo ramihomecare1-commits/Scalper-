@@ -24,7 +24,8 @@ class Config:
     
     # Trading Configuration
     TRADING_PAIRS = os.getenv("TRADING_PAIRS", "BTC-USDT-SWAP,ETH-USDT-SWAP").split(",")
-    TIMEFRAMES = ["1M", "5M", "10M", "1H"]  # OKX uses uppercase M for minutes
+    # OKX candle channel format: candle1m, candle5m, candle15m, candle30m, candle1H, candle4H, etc.
+    TIMEFRAMES = ["1m", "5m", "15m", "1H"]  # Valid OKX timeframes
     
     # Trading Mode: SPOT or SWAP (perpetual futures)
     TRADING_MODE = os.getenv("TRADING_MODE", "SWAP")  # SWAP for leverage, SPOT for no leverage
