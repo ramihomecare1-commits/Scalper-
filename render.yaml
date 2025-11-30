@@ -1,0 +1,40 @@
+version: 1
+services:
+  - type: worker
+    name: scalper-bot
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: ENV
+        sync: false
+      - key: DEBUG
+        sync: false
+      - key: DRY_RUN
+        sync: false
+      - key: LOG_LEVEL
+        sync: false
+      - key: OKX_API_KEY
+        sync: false
+      - key: OKX_SECRET_KEY
+        sync: false
+      - key: OKX_PASSPHRASE
+        sync: false
+      - key: OKX_DEMO_TRADING
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: DEEPSEEK_MODEL
+        sync: false
+      - key: TRADING_PAIRS
+        sync: false
+      - key: LEVERAGE
+        sync: false
+      - key: POSITION_SIZE_PERCENT
+        sync: false
+      - key: MAX_LOSS_PER_TRADE_PERCENT
+        sync: false
+      - key: RISK_REWARD_RATIO
+        sync: false

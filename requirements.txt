@@ -25,6 +25,3 @@ asyncio==3.4.3
 # Testing
 pytest==7.4.3
 pytest-asyncio==0.21.1
-
-# For Render deployment
-gunicorn==21.2.0
