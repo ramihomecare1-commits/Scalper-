@@ -44,10 +44,13 @@ class DataProcessor:
         """
         Normalize order book data
         Returns top 20 bids and asks
+        OKX format: [price, size, liquidated_orders, num_orders]
         """
         try:
-            bids = [[float(p), float(s)] for p, s, _ in data.get("bids", [])[:20]]
-            asks = [[float(p), float(s)] for p, s, _ in data.get("asks", [])[:20]]
+            # OKX returns 4 elements: [price, size, liquidated_orders, num_orders]
+            # We only need price and size
+            bids = [[float(p), float(s)] for p, s, *_ in data.get("bids", [])[:20]]
+            asks = [[float(p), float(s)] for p, s, *_ in data.get("asks", [])[:20]]
             
             return {
                 "instId": data.get("instId"),
