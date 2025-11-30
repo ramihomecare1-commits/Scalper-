@@ -1,0 +1,30 @@
+# Core dependencies
+python-dotenv==1.0.0
+loguru==0.7.2
+
+# Data processing
+pandas==2.1.4
+numpy==1.26.2
+
+# Technical analysis
+ta==0.11.0
+
+# OKX SDK (note: using websockets for real-time data as OKX SDK may have limitations)
+websockets==12.0
+
+# HTTP requests
+requests==2.31.0
+aiohttp==3.9.1
+
+# AI/ML
+openai==1.6.1
+
+# Async support
+asyncio==3.4.3
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+
+# For Render deployment
+gunicorn==21.2.0
