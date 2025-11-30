@@ -64,6 +64,11 @@ class OKXWebSocket:
         while self.running:
             try:
                 msg = await self.ws.recv()
+                
+                # Handle non-JSON messages (like "pong")
+                if not msg or not msg.strip().startswith('{'):
+                    continue
+                
                 data = json.loads(msg)
                 
                 if "event" in data:
@@ -99,6 +104,9 @@ class OKXWebSocket:
                 log.warning("WebSocket connection closed")
                 await self._reconnect()
                 break
+            except json.JSONDecodeError:
+                # Ignore non-JSON messages (like "pong")
+                continue
             except Exception as e:
                 log.error(f"Error in listener: {e}")
                 await asyncio.sleep(1)
