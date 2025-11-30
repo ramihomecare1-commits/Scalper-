@@ -1,4 +1,5 @@
 import aiohttp
+import asyncio
 import json
 from typing import Dict, Optional
 from config import Config
@@ -43,7 +44,7 @@ class DeepSeekClient:
                     f"{self.base_url}/chat/completions",
                     headers=headers,
                     json=payload,
-                    timeout=aiohttp.ClientTimeout(total=30)
+                    timeout=aiohttp.ClientTimeout(total=60)  # 60s timeout for R1 reasoning model
                 ) as response:
                     if response.status != 200:
                         error_text = await response.text()
@@ -58,6 +59,12 @@ class DeepSeekClient:
 
         except aiohttp.ClientError as e:
             log.error(f"DeepSeek API connection error: {e}")
+            return None
+        except asyncio.TimeoutError:
+            log.warning(f"DeepSeek API timeout (model may be thinking) - skipping this analysis cycle")
+            return None
+        except json.JSONDecodeError as e:
+            log.error(f"Failed to parse AI response as JSON: {e}")
             return None
         except Exception as e:
             log.error(f"DeepSeek API error: {e}")
