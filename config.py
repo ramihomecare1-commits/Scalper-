@@ -23,12 +23,14 @@ class Config:
     DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat") # or specific R1 model name if available via API
     
     # Trading Configuration
-    TRADING_PAIRS = os.getenv("TRADING_PAIRS", "BTC-USDT-SWAP,ETH-USDT-SWAP").split(",")
+    # Testing with SPOT first - demo might not have SWAP contracts
+    TRADING_PAIRS = os.getenv("TRADING_PAIRS", "BTC-USDT,ETH-USDT").split(",")
     # OKX candle channel format: candle1m, candle5m, candle15m, candle30m, candle1H, candle4H, etc.
     TIMEFRAMES = ["1m", "5m", "15m", "1H"]  # Valid OKX timeframes
     
     # Trading Mode: SPOT or SWAP (perpetual futures)
-    TRADING_MODE = os.getenv("TRADING_MODE", "SWAP")  # SWAP for leverage, SPOT for no leverage
+    # Start with SPOT to verify instruments exist in demo
+    TRADING_MODE = os.getenv("TRADING_MODE", "SPOT")  # SWAP for leverage, SPOT for no leverage
     
     # Risk Management
     LEVERAGE = int(os.getenv("LEVERAGE", "3"))
