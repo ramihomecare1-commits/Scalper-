@@ -61,38 +61,6 @@ class OKXClient:
             
             # Attach SL/TP if provided (for OCO or simple attach depending on mode)
             # OKX allows attaching SL/TP to order placement
-            if slTriggerPx:
-                args["slTriggerPx"] = slTriggerPx
-                args["slOrdPx"] = "-1" # Market order for SL
-            
-            if tpTriggerPx:
-                args["tpTriggerPx"] = tpTriggerPx
-                args["tpOrdPx"] = "-1" # Market order for TP
-
-            log.info(f"Placing order: {args}")
-            
-            if Config.DRY_RUN:
-                log.info("DRY RUN: Order not placed")
-                return {"code": "0", "data": [{"ordId": "dry_run_id"}]}
-
-            result = self.tradeAPI.place_order(**args)
-            
-            if result.get("code") == "0":
-                log.info(f"Order placed successfully: {result['data'][0]['ordId']}")
-                return result
-            else:
-                log.error(f"Order placement failed: {result}")
-                return result
-
-        except Exception as e:
-            log.error(f"Exception placing order: {e}")
-            return {"code": "-1", "msg": str(e)}
-
-    def cancel_order(self, instId: str, ordId: str) -> bool:
-        """Cancel an order"""
-        try:
-            if Config.DRY_RUN:
-                log.info(f"DRY RUN: Cancel order {ordId}")
                 return True
 
             result = self.tradeAPI.cancel_order(instId=instId, ordId=ordId)
