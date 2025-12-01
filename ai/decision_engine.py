@@ -21,7 +21,11 @@ class DecisionEngine:
             decision = await self.ai_client.analyze_market(prompt)
             
             if not decision:
+                log.debug(f"{symbol}: No decision from AI")
                 return None
+            
+            # Log the AI's decision before validation
+            log.info(f"{symbol}: AI Decision - Action: {decision.get('action')}, Confidence: {decision.get('confidence')}%, Reasoning: {decision.get('reasoning', 'N/A')[:100]}")
 
             # 3. Validate decision
             if self._validate_decision(decision, market_data):
