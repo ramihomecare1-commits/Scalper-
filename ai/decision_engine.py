@@ -36,6 +36,52 @@ class DecisionEngine:
         except Exception as e:
             log.error(f"Error in decision engine: {e}")
             return None
+    
+    async def evaluate_multiple_markets(self, symbols_data: Dict) -> Dict[str, Optional[Dict]]:
+        """
+        Evaluate multiple markets in a single AI call
+        Returns dict of {symbol: decision}
+        """
+        try:
+            if not symbols_data:
+                return {}
+            
+            # Format data for all symbols
+            combined_prompt = "Analyze the following markets and provide trading decisions for each:\n\n"
+            for symbol, market_data in symbols_data.items():
+                combined_prompt += f"\n=== {symbol} ===\n"
+                combined_prompt += self.prompt_generator.format_market_data(symbol, market_data)
+                combined_prompt += "\n"
+            
+            combined_prompt += "\n\nRespond with a JSON object where keys are symbols and values are decision objects:"
+            combined_prompt += '\n{"BTC-USDT-SWAP": {"action":"BUY","confidence":80,...}, "ETH-USDT-SWAP": {"action":"HOLD",...}}'
+            
+            # Get AI analysis for all symbols
+            decisions_dict = await self.ai_client.analyze_market(combined_prompt)
+            
+            if not decisions_dict:
+                return {}
+            
+            # Validate each decision
+            results = {}
+            for symbol, decision in decisions_dict.items():
+                if decision and symbol in symbols_data:
+                    # Log the AI's decision
+                    log.info(f"{symbol}: AI Decision - Action: {decision.get('action')}, Confidence: {decision.get('confidence')}%, Reasoning: {decision.get('reasoning', 'N/A')[:100]}")
+                    
+                    # Validate
+                    if self._validate_decision(decision, symbols_data[symbol]):
+                        results[symbol] = decision
+                    else:
+                        results[symbol] = None
+                else:
+                    results[symbol] = None
+            
+            return results
+            
+        except Exception as e:
+            log.error(f"Error in multi-market evaluation: {e}")
+            return {}
 
     def _validate_decision(self, decision: Dict, market_data: Dict) -> bool:
         """

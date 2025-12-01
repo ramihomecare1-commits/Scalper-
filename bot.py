@@ -144,55 +144,69 @@ class ScalpingBot:
                     await self._update_active_positions()
                     last_position_check = current_time
                 
+                # Check AI analysis cooldown - analyze all symbols together
+                should_analyze = False
                 for symbol in self.symbols:
-                    # 1. Check if data is ready
-                    if not self.mtf_manager.is_ready(symbol):
-                        continue
-                    
-                    # 2. Skip if we already have an open position for this symbol
-                    if symbol in self.active_positions:
-                        log.debug(f"Skipping {symbol} - already have open position")
-                        continue
-                    
-                    # 3. Check cooldown - don't trade same symbol within 5 minutes
-                    if symbol in self.last_trade_time:
-                        time_since_last_trade = current_time - self.last_trade_time[symbol]
-                        if time_since_last_trade < 300:  # 5 minutes cooldown
+                    if symbol not in self.last_ai_analysis:
+                        should_analyze = True
+                        break
+                    time_since_last = current_time - self.last_ai_analysis.get(symbol, 0)
+                    if time_since_last >= self.ai_analysis_cooldown:
+                        should_analyze = True
+                        break
+                
+                if should_analyze:
+                    # Collect data for all symbols
+                    symbols_data = {}
+                    for symbol in self.symbols:
+                        # Skip if already have open position
+                        if symbol in self.active_positions:
+                            log.debug(f"Skipping {symbol} - already have open position")
                             continue
-
-                    # 4. Get Consolidated State
-                    state = self.mtf_manager.get_consolidated_state(symbol)
-                    
-                    # 5. Add Indicators for each timeframe
-                    indicators_by_tf = {}
-                    for tf, candles in state['candles'].items():
-                        indicators_by_tf[tf] = TechnicalIndicators.analyze_candles(candles)
-                    
-                    state['indicators'] = indicators_by_tf
-                    
-                    # 6. Analyze Orderbook
-                    state['market_data']['orderbook_analysis'] = OrderBookAnalyzer.analyze(state['market_data']['orderbook'])
-
-                    # 7. Check AI analysis cooldown - don't spam AI every second
-                    if symbol in self.last_ai_analysis:
-                        time_since_last_analysis = current_time - self.last_ai_analysis[symbol]
-                        if time_since_last_analysis < self.ai_analysis_cooldown:
-                            continue  # Skip AI analysis, wait for cooldown
-                    
-                    # 8. AI Decision
-                    decision = await self.decision_engine.evaluate_market(symbol, state)
-                    self.last_ai_analysis[symbol] = current_time  # Update last analysis time
-                    
-                    if decision:
-                        log.info(f"AI Signal: {decision}")
-                        # 9. Execute Trade (await the async version)
-                        success = await self.executor.execute_signal_async(decision, state)
                         
-                        if success:
-                            # Mark position as active and record trade time
-                            self.active_positions.add(symbol)
-                            self.last_trade_time[symbol] = current_time
-                            log.info(f"Added {symbol} to active positions")
+                        # Skip if traded recently
+                        if symbol in self.last_trade_time:
+                            time_since_last_trade = current_time - self.last_trade_time[symbol]
+                            if time_since_last_trade < 300:  # 5 minutes cooldown
+                                continue
+                        
+                        # Check if data is ready
+                        if not self.mtf_manager.is_ready(symbol):
+                            continue
+                        
+                        # Get consolidated state
+                        state = self.mtf_manager.get_consolidated_state(symbol)
+                        
+                        # Add indicators
+                        indicators_by_tf = {}
+                        for tf, candles in state['candles'].items():
+                            indicators_by_tf[tf] = TechnicalIndicators.analyze_candles(candles)
+                        state['indicators'] = indicators_by_tf
+                        
+                        # Analyze orderbook
+                        state['market_data']['orderbook_analysis'] = OrderBookAnalyzer.analyze(state['market_data']['orderbook'])
+                        
+                        symbols_data[symbol] = state
+                    
+                    # If we have symbols to analyze, make one AI call for all
+                    if symbols_data:
+                        decisions = await self.decision_engine.evaluate_multiple_markets(symbols_data)
+                        
+                        # Update last analysis time for all symbols
+                        for symbol in symbols_data.keys():
+                            self.last_ai_analysis[symbol] = current_time
+                        
+                        # Execute trades for any signals
+                        if decisions:
+                            for symbol, decision in decisions.items():
+                                if decision:
+                                    log.info(f"AI Signal for {symbol}: {decision}")
+                                    success = await self.executor.execute_signal_async(decision, symbols_data[symbol])
+                                    
+                                    if success:
+                                        self.active_positions.add(symbol)
+                                        self.last_trade_time[symbol] = current_time
+                                        log.info(f"Added {symbol} to active positions")
 
                 await asyncio.sleep(1) # 1 second loop
 
