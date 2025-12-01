@@ -34,41 +34,49 @@ class OKXClient:
     def get_balance(self, currency: str = "USDT") -> float:
         """Get account balance for a specific currency"""
         try:
-            if Config.DRY_RUN:
-                log.info(f"DRY RUN: Simulating balance of 10000 {currency}")
-                return 10000.0
-            
-            # Get account balance - wrap in try-except for encoding issues
+            # Get account balance from OKX
             try:
                 result = self.accountAPI.get_account_balance(ccy=currency)
-            except (TypeError, UnicodeDecodeError) as e:
-                log.warning(f"OKX API encoding issue (using fallback): {e}")
-                # Return a safe default for demo trading
-                if Config.OKX_DEMO_TRADING:
-                    return 10000.0
+                
+                # Handle the response carefully
+                if not result:
+                    log.warning(f"Empty response from get_account_balance")
+                    return 0.0
+                
+                # Check if it's a dict and has the expected structure
+                if isinstance(result, dict):
+                    if result.get("code") == "0":
+                        data = result.get("data", [])
+                        if data and isinstance(data, list) and len(data) > 0:
+                            details = data[0].get("details", [])
+                            if details and isinstance(details, list):
+                                for detail in details:
+                                    if detail.get("ccy") == currency:
+                                        # Get available balance
+                                        avail_bal = detail.get("availBal", "0")
+                                        try:
+                                            balance = float(avail_bal)
+                                            log.info(f"Retrieved balance: {balance} {currency}")
+                                            return balance
+                                        except (ValueError, TypeError):
+                                            log.error(f"Could not convert balance to float: {avail_bal}")
+                                            return 0.0
+                    else:
+                        log.warning(f"OKX API returned code: {result.get('code')}, msg: {result.get('msg')}")
+                        return 0.0
+                else:
+                    log.warning(f"Unexpected response type: {type(result)}")
+                    return 0.0
+                
+                log.warning(f"Could not find {currency} in account details")
                 return 0.0
-            
-            if result and result.get("code") == "0":
-                data = result.get("data", [])
-                if data and len(data) > 0:
-                    details = data[0].get("details", [])
-                    for detail in details:
-                        if detail.get("ccy") == currency:
-                            # Get available balance
-                            avail_bal = detail.get("availBal", "0")
-                            return float(avail_bal)
-            
-            log.warning(f"Could not get balance for {currency}, using fallback")
-            # Return fallback for demo
-            if Config.OKX_DEMO_TRADING:
-                return 10000.0
-            return 0.0
+                
+            except (TypeError, UnicodeDecodeError, AttributeError) as e:
+                log.error(f"OKX API error (encoding/type issue): {e}")
+                return 0.0
             
         except Exception as e:
             log.error(f"Exception getting balance: {e}")
-            # In demo mode, return simulated balance even on error
-            if Config.DRY_RUN or Config.OKX_DEMO_TRADING:
-                return 10000.0
             return 0.0
 
     def place_order(self, instId: str, tdMode: str, side: str, ordType: str, sz: str, px: Optional[str] = None, slTriggerPx: Optional[str] = None, tpTriggerPx: Optional[str] = None) -> Dict:
