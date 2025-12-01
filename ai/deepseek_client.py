@@ -73,19 +73,33 @@ class DeepSeekClient:
                         return None
                     
                     data = await response.json()
-                    content = data["choices"][0]["message"]["content"]
-                    log.debug(f"AI Response from {model}: {content}")
                     
-                    return json.loads(content)
+                    # Check if response has the expected structure
+                    if "choices" not in data or not data["choices"]:
+                        log.error(f"Unexpected API response structure from {model}: {data}")
+                        return None
+                    
+                    content = data["choices"][0]["message"]["content"]
+                    
+                    # Log the raw content for debugging
+                    if not content or content.strip() == "":
+                        log.error(f"Empty response from {model}")
+                        return None
+                    
+                    log.debug(f"AI Response from {model}: {content[:200]}...")  # Log first 200 chars
+                    
+                    # Try to parse JSON
+                    try:
+                        return json.loads(content)
+                    except json.JSONDecodeError as e:
+                        log.error(f"Failed to parse AI response as JSON from {model}. Content: {content[:500]}")
+                        return None
                     
         except aiohttp.ClientError as e:
             log.error(f"DeepSeek API connection error for model {model}: {e}")
             return None
         except asyncio.TimeoutError:
             log.warning(f"DeepSeek API timeout for model {model} (may be thinking) - trying fallback")
-            return None
-        except json.JSONDecodeError as e:
-            log.error(f"Failed to parse AI response as JSON from {model}: {e}")
             return None
         except Exception as e:
             log.error(f"DeepSeek API error for model {model}: {e}")
