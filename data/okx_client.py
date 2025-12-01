@@ -38,8 +38,15 @@ class OKXClient:
                 log.info(f"DRY RUN: Simulating balance of 10000 {currency}")
                 return 10000.0
             
-            # Get account balance
-            result = self.accountAPI.get_account_balance(ccy=currency)
+            # Get account balance - wrap in try-except for encoding issues
+            try:
+                result = self.accountAPI.get_account_balance(ccy=currency)
+            except (TypeError, UnicodeDecodeError) as e:
+                log.warning(f"OKX API encoding issue (using fallback): {e}")
+                # Return a safe default for demo trading
+                if Config.OKX_DEMO_TRADING:
+                    return 10000.0
+                return 0.0
             
             if result and result.get("code") == "0":
                 data = result.get("data", [])
@@ -51,13 +58,16 @@ class OKXClient:
                             avail_bal = detail.get("availBal", "0")
                             return float(avail_bal)
             
-            log.warning(f"Could not get balance for {currency}, defaulting to 0")
+            log.warning(f"Could not get balance for {currency}, using fallback")
+            # Return fallback for demo
+            if Config.OKX_DEMO_TRADING:
+                return 10000.0
             return 0.0
             
         except Exception as e:
             log.error(f"Exception getting balance: {e}")
-            # In DRY_RUN mode, return simulated balance even on error
-            if Config.DRY_RUN:
+            # In demo mode, return simulated balance even on error
+            if Config.DRY_RUN or Config.OKX_DEMO_TRADING:
                 return 10000.0
             return 0.0
 
