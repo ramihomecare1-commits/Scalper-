@@ -55,9 +55,16 @@ class DeepSeekClient:
             payload = {
                 "model": model,
                 "messages": [
-                    {"role": "user", "content": prompt}
+                    {
+                        "role": "system", 
+                        "content": "You are a JSON-only API. You MUST respond with valid JSON only. Never include explanations, markdown, or any text outside the JSON object. Your response must be parseable by json.loads()."
+                    },
+                    {
+                        "role": "user", 
+                        "content": prompt + "\n\nREMINDER: Respond with ONLY valid JSON. No text before or after the JSON object."
+                    }
                 ],
-                "temperature": 0.7
+                "temperature": 0.3  # Lower temperature for more consistent JSON output
             }
             
             async with aiohttp.ClientSession() as session:
@@ -85,6 +92,14 @@ class DeepSeekClient:
                     if not content or content.strip() == "":
                         log.error(f"Empty response from {model}")
                         return None
+                    
+                    # Try to extract JSON if wrapped in markdown
+                    content = content.strip()
+                    if content.startswith("```"):
+                        # Remove markdown code blocks
+                        lines = content.split("\n")
+                        content = "\n".join(lines[1:-1]) if len(lines) > 2 else content
+                        content = content.replace("```json", "").replace("```", "").strip()
                     
                     log.debug(f"AI Response from {model}: {content[:200]}...")  # Log first 200 chars
                     
