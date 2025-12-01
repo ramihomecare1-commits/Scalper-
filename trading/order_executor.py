@@ -27,7 +27,13 @@ class OrderExecutor:
             # 1. Get Account Balance
             equity = self.client.get_balance("USDT")
             if equity <= 0:
-                log.error("Insufficient equity")
+                error_msg = "Insufficient equity - balance check failed"
+                log.error(error_msg)
+                # Send Telegram notification
+                try:
+                    await self.telegram.notify_error(f"⚠️ {error_msg}")
+                except:
+                    pass
                 return False
 
             # 2. Calculate Position Size
