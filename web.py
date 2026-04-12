@@ -37,8 +37,11 @@ def bot_status():
     """Real-time bot status"""
     import time
     
+    thread_alive = bot_thread.is_alive() if bot_thread else False
+    
     status = {
         "is_running": False,
+        "thread_alive": thread_alive,
         "active_positions": [],
         "tracked_symbols": [],
         "last_analysis_times": {},
@@ -47,11 +50,11 @@ def bot_status():
     }
     
     if bot:
-        status["is_running"] = bot.running
+        status["is_running"] = bot.running and thread_alive
         status["active_positions"] = list(bot.active_positions)
         status["tracked_symbols"] = bot.symbols
         status["last_analysis_times"] = bot.last_ai_analysis
-        
+    
     try:
         tracker = PerformanceTracker()
         status["stats"] = tracker.get_stats()
