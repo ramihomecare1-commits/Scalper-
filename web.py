@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, render_template
 import threading
 import asyncio
 from bot import ScalpingBot
@@ -29,12 +29,36 @@ def run_bot():
 
 @app.route('/')
 def home():
-    """Health check endpoint"""
-    return jsonify({
-        "status": "running",
-        "service": "AI Crypto Scalping Bot",
-        "message": "Bot is running in the background"
-    })
+    """Dashboard UI endpoint"""
+    return render_template('index.html')
+
+@app.route('/api/bot_status')
+def bot_status():
+    """Real-time bot status"""
+    import time
+    
+    status = {
+        "is_running": False,
+        "active_positions": [],
+        "tracked_symbols": [],
+        "last_analysis_times": {},
+        "server_time": time.time(),
+        "stats": {}
+    }
+    
+    if bot:
+        status["is_running"] = bot.running
+        status["active_positions"] = list(bot.active_positions)
+        status["tracked_symbols"] = bot.symbols
+        status["last_analysis_times"] = bot.last_ai_analysis
+        
+    try:
+        tracker = PerformanceTracker()
+        status["stats"] = tracker.get_stats()
+    except Exception:
+        pass
+        
+    return jsonify(status)
 
 @app.route('/health')
 def health():

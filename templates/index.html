@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scalper AI Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.6);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;
+            --success: #22c55e;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+        }
+
+        body {
+            background: var(--bg-color);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(34, 197, 94, 0.1) 0px, transparent 50%);
+            background-attachment: fixed;
+            color: var(--text-main);
+            font-family: 'Outfit', sans-serif;
+            margin: 0;
+            padding: 2rem;
+            min-height: 100vh;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 3rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(34, 197, 94, 0.1);
+            color: var(--success);
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            border: 1px solid rgba(34, 197, 94, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .status-badge.stopped {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+            border-color: rgba(239, 68, 68, 0.2);
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            background-color: currentColor;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+            70% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+        }
+
+        .card-header {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 0.5rem 0;
+        }
+
+        .symbol-tag {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 0.4rem 0.8rem;
+            border-radius: 0.5rem;
+            font-size: 0.9rem;
+            display: inline-block;
+            margin: 0.2rem;
+            border: 1px solid var(--card-border);
+        }
+
+        .symbol-tag.active {
+            background: rgba(34, 197, 94, 0.1);
+            border-color: rgba(34, 197, 94, 0.3);
+            color: var(--success);
+        }
+
+        .footer {
+            margin-top: 3rem;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        /* Loading Skeleton */
+        .skeleton {
+            background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%);
+            background-size: 200% 100%;
+            animation: skeleton-loading 1.5s infinite;
+            border-radius: 0.25rem;
+            height: 2rem;
+            width: 50%;
+        }
+
+        @keyframes skeleton-loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        
+        .list-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .list-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.75rem;
+            background: rgba(0,0,0,0.15);
+            border-radius: 0.5rem;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Scalper AI</h1>
+        <div id="status-indicator" class="status-badge">
+            <div class="dot"></div>
+            <span id="status-text">Connecting...</span>
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <div class="card-header">📊 Total Executed Trades</div>
+            <div id="total-trades" class="stat-value skeleton"></div>
+            <div style="color: var(--text-muted); font-size: 0.9rem;">
+                Longs: <span id="longs-count">-</span> | Shorts: <span id="shorts-count">-</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">🎯 AI Confidence Avg</div>
+            <div style="display: flex; align-items: baseline; gap: 0.5rem;">
+                <div id="avg-confidence" class="stat-value skeleton"></div>
+                <span style="color: var(--text-muted)" id="conf-symbol"></span>
+            </div>
+            <div style="color: var(--text-muted); font-size: 0.9rem;">From historical trades</div>
+        </div>
+
+        <div class="card" style="grid-column: span 2;">
+            <div class="card-header">👁️ Tracked Markets & Cooldowns</div>
+            <div id="tracked-symbols" style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                <div class="skeleton" style="width: 100px; height: 30px;"></div>
+                <div class="skeleton" style="width: 100px; height: 30px;"></div>
+            </div>
+        </div>
+
+        <div class="card" style="grid-column: span 2;">
+            <div class="card-header">🔥 Active Positions (Live)</div>
+            <div id="active-positions" class="list-group">
+                 <div class="skeleton" style="width: 100%; height: 40px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        Auto-refreshing every 5 seconds • Last updated: <span id="last-refresh">Never</span>
+    </div>
+
+    <script>
+        function updateDashboard() {
+            fetch('/api/bot_status')
+                .then(response => response.json())
+                .then(data => {
+                    // Update Status
+                    const statusInd = document.getElementById('status-indicator');
+                    const statusText = document.getElementById('status-text');
+                    if(data.is_running) {
+                        statusInd.className = 'status-badge';
+                        statusText.textContent = 'System Online';
+                    } else {
+                        statusInd.className = 'status-badge stopped';
+                        statusText.textContent = 'System Paused / Error';
+                    }
+
+                    const stats = data.stats || {};
+
+                    // Update Trades
+                    let totalTrades = stats.total_trades || 0;
+                    document.getElementById('total-trades').className = 'stat-value';
+                    document.getElementById('total-trades').textContent = totalTrades;
+                    
+                    let actions = stats.actions || {};
+                    document.getElementById('longs-count').textContent = actions.buy || 0;
+                    document.getElementById('shorts-count').textContent = actions.sell || 0;
+
+                    // Update Confidence
+                    document.getElementById('avg-confidence').className = 'stat-value';
+                    if(stats.avg_confidence) {
+                        document.getElementById('avg-confidence').textContent = (stats.avg_confidence * 100).toFixed(1);
+                        document.getElementById('conf-symbol').textContent = '%';
+                    } else {
+                        document.getElementById('avg-confidence').textContent = 'N/A';
+                    }
+
+                    // Update Tracked Symbols
+                    const symbolsDiv = document.getElementById('tracked-symbols');
+                    symbolsDiv.innerHTML = '';
+                    
+                    if (data.tracked_symbols && data.tracked_symbols.length > 0) {
+                        data.tracked_symbols.forEach(symbol => {
+                            let tag = document.createElement('div');
+                            tag.className = 'symbol-tag';
+                            
+                            // Calculate time since last AI check
+                            let lastCheck = data.last_analysis_times[symbol];
+                            let timeMsg = "Waiting...";
+                            if(lastCheck) {
+                                let secondsAgo = Math.floor(data.server_time - lastCheck);
+                                timeMsg = `Checked ${secondsAgo}s ago`;
+                            }
+                            
+                            tag.innerHTML = `<strong>${symbol}</strong><br><span style="font-size: 0.75rem; color: var(--text-muted)">${timeMsg}</span>`;
+                            symbolsDiv.appendChild(tag);
+                        });
+                    } else {
+                        symbolsDiv.innerHTML = '<span style="color: var(--text-muted)">No symbols tracked.</span>';
+                    }
+
+                    // Update Active Positions
+                    const posDiv = document.getElementById('active-positions');
+                    posDiv.innerHTML = '';
+                    if (data.active_positions && data.active_positions.length > 0) {
+                        data.active_positions.forEach(pos => {
+                            let item = document.createElement('div');
+                            item.className = 'list-item';
+                            item.innerHTML = `<span style="color: var(--accent); font-weight: 600;">⚡ ${pos}</span> <span style="background: rgba(239, 68, 68, 0.2); padding: 0.2rem 0.5rem; border-radius: 0.25rem; font-size: 0.8rem; color: var(--danger)">Stop Loss Active</span>`;
+                            posDiv.appendChild(item);
+                        });
+                    } else {
+                        posDiv.innerHTML = '<div class="list-item" style="justify-content: center; color: var(--text-muted)">No active positions currently.</div>';
+                    }
+
+                    // Last updated
+                    let now = new Date();
+                    document.getElementById('last-refresh').textContent = now.toLocaleTimeString();
+                })
+                .catch(err => {
+                    console.error('Failed to fetch stats:', err);
+                    document.getElementById('status-indicator').className = 'status-badge stopped';
+                    document.getElementById('status-text').textContent = 'Connection Lost';
+                });
+        }
+
+        // Initial fetch
+        updateDashboard();
+        
+        // Polling every 5 seconds
+        setInterval(updateDashboard, 5000);
+    </script>
+</body>
+</html>
