@@ -8,6 +8,7 @@ from utils.logger import log
 app = Flask(__name__)
 bot = None
 bot_thread = None
+bot_error = None
 
 def run_bot():
     """Run the bot in a separate thread"""
@@ -23,7 +24,9 @@ def run_bot():
         
         loop.run_until_complete(bot.start())
     except Exception as e:
+        global bot_error
         import traceback
+        bot_error = str(e)
         log.error(f"Bot error: {e}")
         log.error(f"Traceback: {traceback.format_exc()}")
 
@@ -46,6 +49,7 @@ def bot_status():
         "tracked_symbols": [],
         "last_analysis_times": {},
         "server_time": time.time(),
+        "error": bot_error,
         "stats": {}
     }
     

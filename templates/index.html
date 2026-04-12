@@ -183,6 +183,9 @@
             <span id="status-text">Connecting...</span>
         </div>
     </div>
+    
+    <div id="error-container" style="display: none; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #fca5a5; padding: 1rem; border-radius: 0.5rem; margin-bottom: 2rem; font-family: monospace;">
+    </div>
 
     <div class="grid">
         <div class="card">
@@ -230,12 +233,21 @@
                     // Update Status
                     const statusInd = document.getElementById('status-indicator');
                     const statusText = document.getElementById('status-text');
+                    const errorContainer = document.getElementById('error-container');
+
                     if(data.is_running) {
                         statusInd.className = 'status-badge';
                         statusText.textContent = 'System Online';
+                        errorContainer.style.display = 'none';
                     } else {
                         statusInd.className = 'status-badge stopped';
                         statusText.textContent = 'System Paused / Error';
+                        if (data.error) {
+                            errorContainer.style.display = 'block';
+                            errorContainer.innerHTML = '<strong>Bot Crash Report:</strong><br>' + data.error;
+                        } else {
+                            errorContainer.style.display = 'none';
+                        }
                     }
 
                     const stats = data.stats || {};
