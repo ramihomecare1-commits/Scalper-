@@ -3,6 +3,7 @@ from ai.deepseek_client import DeepSeekClient
 from ai.prompts import PromptGenerator
 from utils.logger import log
 from config import Config
+import asyncio
 
 class DecisionEngine:
     def __init__(self):
@@ -39,43 +40,35 @@ class DecisionEngine:
     
     async def evaluate_multiple_markets(self, symbols_data: Dict) -> Dict[str, Optional[Dict]]:
         """
-        Evaluate multiple markets in a single AI call
-        Returns dict of {symbol: decision}
+        Evaluate multiple markets using concurrent single-symbol AI calls.
+        More reliable than asking the AI to return a complex nested JSON.
         """
         try:
             if not symbols_data:
                 return {}
             
-            # Format data for all symbols
-            combined_prompt = "Analyze the following markets and provide trading decisions for each:\n\n"
-            for symbol, market_data in symbols_data.items():
-                combined_prompt += f"\n=== {symbol} ===\n"
-                combined_prompt += self.prompt_generator.format_market_data(symbol, market_data)
-                combined_prompt += "\n"
+            # Create concurrent tasks — one AI call per symbol
+            async def _evaluate_single(symbol: str, market_data: Dict) -> tuple:
+                """Wrapper that returns (symbol, decision) tuple"""
+                decision = await self.evaluate_market(symbol, market_data)
+                return (symbol, decision)
             
-            combined_prompt += "\n\nRespond with a JSON object where keys are symbols and values are decision objects:"
-            combined_prompt += '\n{"BTC-USDT-SWAP": {"action":"BUY","confidence":80,...}, "ETH-USDT-SWAP": {"action":"HOLD",...}}'
+            tasks = [
+                _evaluate_single(symbol, market_data)
+                for symbol, market_data in symbols_data.items()
+            ]
             
-            # Get AI analysis for all symbols
-            decisions_dict = await self.ai_client.analyze_market(combined_prompt)
+            # Run all AI calls concurrently
+            results_list = await asyncio.gather(*tasks, return_exceptions=True)
             
-            if not decisions_dict:
-                return {}
-            
-            # Validate each decision
+            # Build results dict
             results = {}
-            for symbol, decision in decisions_dict.items():
-                if decision and symbol in symbols_data:
-                    # Log the AI's decision
-                    log.info(f"{symbol}: AI Decision - Action: {decision.get('action')}, Confidence: {decision.get('confidence')}%, Reasoning: {decision.get('reasoning', 'N/A')[:100]}")
-                    
-                    # Validate
-                    if self._validate_decision(decision, symbols_data[symbol]):
-                        results[symbol] = decision
-                    else:
-                        results[symbol] = None
-                else:
-                    results[symbol] = None
+            for result in results_list:
+                if isinstance(result, Exception):
+                    log.error(f"Error in concurrent evaluation: {result}")
+                    continue
+                symbol, decision = result
+                results[symbol] = decision
             
             return results
             

@@ -5,7 +5,7 @@ from utils.logger import log
 class TechnicalIndicators:
     @staticmethod
     def calculate_rsi(prices: np.ndarray, period: int = 14) -> float:
-        """Calculate RSI using numpy"""
+        """Calculate RSI using Wilder's smoothed moving average (correct method)"""
         if len(prices) < period + 1:
             return 50.0
         
@@ -13,8 +13,14 @@ class TechnicalIndicators:
         gains = np.where(deltas > 0, deltas, 0)
         losses = np.where(deltas < 0, -deltas, 0)
         
-        avg_gain = np.mean(gains[-period:])
-        avg_loss = np.mean(losses[-period:])
+        # Seed with SMA for the first period
+        avg_gain = np.mean(gains[:period])
+        avg_loss = np.mean(losses[:period])
+        
+        # Apply Wilder's exponential smoothing for the rest
+        for i in range(period, len(gains)):
+            avg_gain = (avg_gain * (period - 1) + gains[i]) / period
+            avg_loss = (avg_loss * (period - 1) + losses[i]) / period
         
         if avg_loss == 0:
             return 100.0
@@ -29,6 +35,66 @@ class TechnicalIndicators:
         if len(prices) < period:
             return float(prices[-1]) if len(prices) > 0 else 0.0
         return float(np.mean(prices[-period:]))
+
+    @staticmethod
+    def calculate_ema(prices: np.ndarray, period: int) -> np.ndarray:
+        """Calculate Exponential Moving Average (full array)"""
+        if len(prices) < period:
+            return prices.copy()
+        
+        multiplier = 2.0 / (period + 1)
+        ema = np.zeros_like(prices, dtype=float)
+        ema[period - 1] = np.mean(prices[:period])  # Seed with SMA
+        
+        for i in range(period, len(prices)):
+            ema[i] = (prices[i] - ema[i - 1]) * multiplier + ema[i - 1]
+        
+        # Fill initial values with the seed
+        ema[:period - 1] = ema[period - 1]
+        return ema
+
+    @staticmethod
+    def calculate_macd(prices: np.ndarray, fast: int = 12, slow: int = 26, signal_period: int = 9) -> Dict:
+        """Calculate MACD, Signal line, and Histogram"""
+        if len(prices) < slow + signal_period:
+            return {"macd": 0.0, "signal": 0.0, "histogram": 0.0, "crossover": "NONE"}
+        
+        ema_fast = TechnicalIndicators.calculate_ema(prices, fast)
+        ema_slow = TechnicalIndicators.calculate_ema(prices, slow)
+        
+        macd_line = ema_fast - ema_slow
+        signal_line = TechnicalIndicators.calculate_ema(macd_line, signal_period)
+        histogram = macd_line - signal_line
+        
+        # Detect crossover
+        crossover = "NONE"
+        if len(histogram) >= 2:
+            if histogram[-1] > 0 and histogram[-2] <= 0:
+                crossover = "BULLISH"
+            elif histogram[-1] < 0 and histogram[-2] >= 0:
+                crossover = "BEARISH"
+        
+        return {
+            "macd": float(macd_line[-1]),
+            "signal": float(signal_line[-1]),
+            "histogram": float(histogram[-1]),
+            "crossover": crossover
+        }
+
+    @staticmethod
+    def calculate_atr(highs: np.ndarray, lows: np.ndarray, closes: np.ndarray, period: int = 14) -> float:
+        """Calculate Average True Range — measures volatility"""
+        if len(highs) < period + 1:
+            return 0.0
+        
+        tr = np.maximum(
+            highs[1:] - lows[1:],
+            np.maximum(
+                np.abs(highs[1:] - closes[:-1]),
+                np.abs(lows[1:] - closes[:-1])
+            )
+        )
+        return float(np.mean(tr[-period:]))
 
     @staticmethod
     def calculate_bollinger_bands(prices: np.ndarray, period: int = 20, std_dev: int = 2) -> Dict:
@@ -72,6 +138,8 @@ class TechnicalIndicators:
         sma_10 = TechnicalIndicators.calculate_sma(closes, 10)
         bb = TechnicalIndicators.calculate_bollinger_bands(closes)
         vwap = TechnicalIndicators.calculate_vwap(typical_prices, volumes)
+        macd = TechnicalIndicators.calculate_macd(closes)
+        atr = TechnicalIndicators.calculate_atr(highs, lows, closes)
         
         current_price = float(closes[-1])
         
@@ -85,7 +153,12 @@ class TechnicalIndicators:
             "bb_lower": bb["lower"],
             "bb_position": TechnicalIndicators._get_bb_position(current_price, bb),
             "vwap": vwap,
-            "vwap_dist": ((current_price - vwap) / current_price * 100) if vwap > 0 else 0
+            "vwap_dist": ((current_price - vwap) / current_price * 100) if vwap > 0 else 0,
+            "macd": macd["macd"],
+            "macd_signal": macd["signal"],
+            "macd_histogram": macd["histogram"],
+            "macd_crossover": macd["crossover"],
+            "atr": atr
         }
 
     @staticmethod

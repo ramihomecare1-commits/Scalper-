@@ -57,14 +57,15 @@ class DeepSeekClient:
                 "messages": [
                     {
                         "role": "system", 
-                        "content": "You are a JSON-only API. You MUST respond with valid JSON only. Never include explanations, markdown, or any text outside the JSON object. Your response must be parseable by json.loads()."
+                        "content": "You are a JSON-only trading signal API. Respond with valid JSON only. No explanations, no markdown, no text outside the JSON object."
                     },
                     {
                         "role": "user", 
-                        "content": prompt + "\n\nREMINDER: Respond with ONLY valid JSON. No text before or after the JSON object."
+                        "content": prompt
                     }
                 ],
-                "temperature": 0.3  # Lower temperature for more consistent JSON output
+                "temperature": 0.3,  # Lower temperature for more consistent JSON output
+                "max_tokens": 500    # We only need a small JSON response — prevents 402 credit errors
             }
             
             async with aiohttp.ClientSession() as session:

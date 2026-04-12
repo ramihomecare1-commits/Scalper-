@@ -62,9 +62,8 @@ class OrderExecutor:
                 instId=symbol,
                 tdMode=td_mode,
                 side=side,
-                ordType="limit",
+                ordType="market",
                 sz=sz,
-                px=str(entry_price),
                 slTriggerPx=str(stop_loss),
                 tpTriggerPx=str(take_profit)
             )
