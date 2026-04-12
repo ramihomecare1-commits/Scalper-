@@ -69,13 +69,18 @@ class OKXWebSocket:
             await self._subscribe(channels)
 
     async def _subscribe(self, channels: List[Dict]):
-        """Internal subscription method"""
-        msg = {
-            "op": "subscribe",
-            "args": channels
-        }
-        await self.ws.send(json.dumps(msg))
-        log.info(f"Subscribed to {len(channels)} channels")
+        """Internal subscription method with chunking to avoid OKX limits"""
+        chunk_size = 30
+        for i in range(0, len(channels), chunk_size):
+            chunk = channels[i:i + chunk_size]
+            msg = {
+                "op": "subscribe",
+                "args": chunk
+            }
+            if self.ws:
+                await self.ws.send(json.dumps(msg))
+            log.info(f"Subscribed to chunk of {len(chunk)} channels")
+            await asyncio.sleep(0.5) # Slight delay between chunks
 
     async def _listen(self):
         """Listen for messages"""

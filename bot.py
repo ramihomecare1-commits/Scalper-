@@ -18,7 +18,10 @@ class ScalpingBot:
         self.mtf_manager = MultiTimeframeManager()
         self.decision_engine = DecisionEngine()
         self.executor = OrderExecutor()
-        self.symbols = Config.TRADING_PAIRS
+        from data.market_scanner import MarketScanner
+        scanner = MarketScanner()
+        # Fallback to Config.TRADING_PAIRS internally if scanner fails
+        self.symbols = scanner.get_top_pairs(100)
         
         # Track active positions to prevent duplicate trades
         self.active_positions = set()  # Set of symbols with open positions
@@ -56,6 +59,9 @@ class ScalpingBot:
                         ]
                         self.mtf_manager.update_candle(symbol, tf, candle_list)
                     log.info(f"Loaded {len(candles)} historical candles for {symbol} ({tf})")
+                
+                # Rate limit protection: OKX allows 20 req / 2s -> 1 req / 0.1s
+                await asyncio.sleep(0.15)
         
         # 2. Connect to WebSocket for real-time updates
         await self.ws.connect()
@@ -200,6 +206,11 @@ class ScalpingBot:
                         if decisions:
                             for symbol, decision in decisions.items():
                                 if decision:
+                                    # Enforce maximum concurrent active positions limit
+                                    if len(self.active_positions) >= getattr(Config, 'MAX_CONCURRENT_POSITIONS', 5):
+                                        log.warning(f"Max active positions ({getattr(Config, 'MAX_CONCURRENT_POSITIONS', 5)}) reached. Ignoring signal for {symbol}.")
+                                        continue
+                                        
                                     log.info(f"AI Signal for {symbol}: {decision}")
                                     success = await self.executor.execute_signal_async(decision, symbols_data[symbol])
                                     

@@ -34,14 +34,15 @@ class Config:
     TIMEFRAMES = ["1m", "5m", "15m", "1H"]  # Valid OKX timeframes
     
     # Trading Mode: SPOT or SWAP (perpetual futures)
-    # Start with SPOT to verify instruments exist in demo
-    TRADING_MODE = os.getenv("TRADING_MODE", "SPOT")  # SWAP for leverage, SPOT for no leverage
+    # Defaulting to SWAP as requested for top 100 tracking
+    TRADING_MODE = os.getenv("TRADING_MODE", "SWAP")
     
     # Risk Management
     LEVERAGE = int(os.getenv("LEVERAGE", "3"))
     POSITION_SIZE_PERCENT = float(os.getenv("POSITION_SIZE_PERCENT", "0.02")) # 2%
     MAX_LOSS_PER_TRADE_PERCENT = float(os.getenv("MAX_LOSS_PER_TRADE_PERCENT", "0.01")) # 1% of account
     RISK_REWARD_RATIO = float(os.getenv("RISK_REWARD_RATIO", "1.5"))
+    MAX_CONCURRENT_POSITIONS = int(os.getenv("MAX_CONCURRENT_POSITIONS", "5"))
     
     # Render / Deployment
     PORT = int(os.getenv("PORT", "10000"))

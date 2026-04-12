@@ -15,6 +15,10 @@ class DecisionEngine:
         Evaluate market data and generate trade decision
         """
         try:
+            # Pre-filter to save AI API costs
+            if not self._should_analyze(symbol, market_data):
+                return None
+
             # 1. Format data for AI
             prompt = self.prompt_generator.format_market_data(symbol, market_data)
             
@@ -115,3 +119,39 @@ class DecisionEngine:
         except Exception as e:
             log.error(f"Error validating decision: {e}")
             return False
+
+    def _should_analyze(self, symbol: str, market_data: Dict) -> bool:
+        """
+        Pre-filter to determine if we should spend AI credits on this symbol.
+        Requires some form of momentum or setup to be present.
+        """
+        try:
+            indicators_by_tf = market_data.get('indicators', {})
+            primary_tf = list(indicators_by_tf.keys())[0] if indicators_by_tf else None
+            
+            if not primary_tf:
+                return True # Default to analyze if data is weird
+                
+            ind = indicators_by_tf[primary_tf]
+            
+            # Check RSI for overbought/oversold momentum
+            rsi = ind.get('rsi', 50)
+            if rsi > 65 or rsi < 35:
+                return True
+                
+            # Check MACD for recent crossovers
+            macd_crossover = ind.get('macd_crossover', 'NONE')
+            if macd_crossover != 'NONE':
+                return True
+                
+            # Check Bollinger Bands (price near edges)
+            bb_pos = ind.get('bb_position', 'LOWER_HALF')
+            if bb_pos in ['ABOVE_UPPER', 'BELOW_LOWER']:
+                return True
+
+            log.debug(f"{symbol}: Pre-filter failed (no momentum). Skipping AI analysis to save credits.")
+            return False
+            
+        except Exception as e:
+            log.error(f"Error in pre-filter for {symbol}: {e}")
+            return True # Fail open to let AI decide
