@@ -186,3 +186,39 @@ class OKXClient:
         except Exception as e:
             log.debug(f"Exception getting positions (non-critical): {e}")
             return []
+
+    def get_instruments_specs(self, instType: str = "SWAP") -> Dict[str, Dict]:
+        """
+        Fetch instrument precision specifications (lot size, min size, tick size).
+        Returns a dictionary mapping instId to a dictionary of specs.
+        """
+        try:
+            # We use the MarketAPI to fetch public instrument rules
+            # We enforce flag=0 (Mainnet) behind the scenes by using a direct Mainnet client 
+            # if we are in DEMO mode, because DEMO mode API might hide newer coins' specifications
+            # but we need specs regardless to round correctly before doing a place_order (which fails safely)
+            
+            # Since OKX python SDK makes it tricky to flip flags on the fly, 
+            # we will just use the configured one, it usually returns public instruments fine.
+            result = self.marketAPI.get_instruments(instType=instType)
+            
+            specs = {}
+            if isinstance(result, dict) and result.get("code") == "0":
+                data = result.get("data", [])
+                for item in data:
+                    instId = item.get("instId")
+                    specs[instId] = {
+                        "lotSz": float(item.get("lotSz", 1)),
+                        "minSz": float(item.get("minSz", 1)),
+                        "tickSz": float(item.get("tickSz", 0.01)),
+                        "ctVal": float(item.get("ctVal", 1)) if item.get("ctVal") else 1.0  # Contract value multiplier
+                    }
+                log.info(f"Loaded precision specs for {len(specs)} instruments.")
+                return specs
+            else:
+                log.warning(f"Failed to fetch instrument specs: {result}")
+                return {}
+                
+        except Exception as e:
+            log.error(f"Error fetching instrument specs: {e}")
+            return {}

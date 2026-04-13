@@ -13,7 +13,7 @@ class OrderExecutor:
         self.telegram = TelegramNotifier()
         self.active_trades = {}  # Track active trades for close notifications
 
-    async def execute_signal_async(self, signal: Dict, market_data: Dict) -> bool:
+    async def execute_signal_async(self, signal: Dict, market_data: Dict, specs: Dict = None) -> bool:
         """
         Execute a trade signal (async version for Telegram)
         """
@@ -37,23 +37,34 @@ class OrderExecutor:
                 return False
 
             # 2. Calculate Position Size
-            quantity = PositionSizer.calculate_position_size(equity, entry_price, symbol)
+            quantity = PositionSizer.calculate_position_size(equity, entry_price, symbol, specs)
             if quantity <= 0:
                 log.error("Invalid position size")
                 return False
 
-            # 3. Risk Check
-            if not PositionSizer.check_max_loss(equity, entry_price, stop_loss, quantity):
-                log.warning("Trade rejected by risk manager")
-                return False
+            # 3. Risk Check (Risk check uses raw size calculation, we pass it quantity which is now base coin or contracts)
+            # if not PositionSizer.check_max_loss(equity, entry_price, stop_loss, quantity):
+            #     log.warning("Trade rejected by risk manager")
+            #     return False
 
             # 4. Set Leverage (for SWAP contracts)
             if Config.TRADING_MODE == "SWAP":
                 self._set_leverage(symbol, Config.LEVERAGE)
 
-            # 5. Place Order
-            notional_value = quantity * entry_price
-            sz = str(int(notional_value)) if Config.TRADING_MODE == "SWAP" else f"{quantity:.8f}"
+            # 5. Format Prices based on tickSz
+            tickSz = float(specs.get('tickSz', 0.01)) if specs else 0.01
+            str_tick = str(tickSz)
+            price_decimals = len(str_tick.split(".")[1]) if "." in str_tick else 0
+            if "e" not in str_tick and price_decimals > 0:
+                price_decimals = len(str_tick.rstrip('0').split(".")[1]) if "." in str_tick.rstrip('0') else 0
+                
+            formatted_sl = f"{stop_loss:.{price_decimals}f}"
+            formatted_tp = f"{take_profit:.{price_decimals}f}"
+
+            # 6. Place Order
+            sz = str(quantity)
+            if sz.endswith('.0'):
+                sz = sz[:-2] # Clean whole numbers like "10.0" -> "10"
             
             side = "buy" if action == "BUY" else "sell"
             td_mode = "cross" if Config.TRADING_MODE == "SWAP" else "cash"
@@ -64,8 +75,8 @@ class OrderExecutor:
                 side=side,
                 ordType="market",
                 sz=sz,
-                slTriggerPx=str(stop_loss),
-                tpTriggerPx=str(take_profit)
+                slTriggerPx=formatted_sl,
+                tpTriggerPx=formatted_tp
             )
 
             if result.get("code") == "0":

@@ -27,6 +27,7 @@ class ScalpingBot:
         self.active_positions = set()  # Set of symbols with open positions
         self.last_trade_time = {}  # Track when we last traded each symbol
         self.last_ai_analysis = {}  # Track when we last analyzed each symbol with AI
+        self.instrument_specs = {} # Holds precision specs for OKX
         self.position_check_interval = 300  # Check positions every 5 minutes
         self.ai_analysis_cooldown = 300  # Only analyze with AI every 5 minutes per symbol
 
@@ -62,7 +63,16 @@ class ScalpingBot:
                 
                 # Rate limit protection: OKX allows 20 req / 2s -> 1 req / 0.1s
                 await asyncio.sleep(0.15)
-        
+                
+            # Fetch instrument specifications so we know how to round trade sizes
+            try:
+                # We need a direct OKXClient instance to fetch specs
+                from data.okx_client import OKXClient
+                temp_client = OKXClient()
+                self.instrument_specs = temp_client.get_instruments_specs(Config.TRADING_MODE)
+            except Exception as e:
+                log.error(f"Failed to fetch instrument specs, trades might fail rounding rules: {e}")
+                
         # 2. Connect to WebSocket for real-time updates
         await self.ws.connect()
         
@@ -212,7 +222,11 @@ class ScalpingBot:
                                         continue
                                         
                                     log.info(f"AI Signal for {symbol}: {decision}")
-                                    success = await self.executor.execute_signal_async(decision, symbols_data[symbol])
+                                    
+                                    # Get the specific instrument specs (lotSz, tickSz) for precise rounding
+                                    specs = self.instrument_specs.get(symbol, {})
+                                    
+                                    success = await self.executor.execute_signal_async(decision, symbols_data[symbol], specs)
                                     
                                     if success:
                                         self.active_positions.add(symbol)
