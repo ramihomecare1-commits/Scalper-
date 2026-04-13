@@ -21,7 +21,7 @@ class ScalpingBot:
         from data.market_scanner import MarketScanner
         scanner = MarketScanner()
         # Fallback to Config.TRADING_PAIRS internally if scanner fails
-        self.symbols = scanner.get_top_pairs(100)
+        self.symbols = scanner.get_top_pairs(30)
         
         # Track active positions to prevent duplicate trades
         self.active_positions = set()  # Set of symbols with open positions
