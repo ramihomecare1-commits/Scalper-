@@ -8,7 +8,9 @@ from utils.logger import log
 
 class OKXWebSocket:
     def __init__(self):
-        self.url = "wss://wspap.okx.com:8443/ws/v5/public" if Config.OKX_DEMO_TRADING else "wss://ws.okx.com:8443/ws/v5/public"
+        # Always use the mainnet WebSocket for public data (tickers, books). 
+        # The demo websocket restricts many tokens from the top 100 list which causes "doesn't exist" errors.
+        self.url = "wss://ws.okx.com:8443/ws/v5/public"
         self.ws = None
         self.running = False
         self.callbacks: Dict[str, List[Callable]] = {}

@@ -29,11 +29,11 @@ class DataProcessor:
         try:
             return {
                 "instId": data.get("instId"),
-                "last": float(data.get("last", 0)),
-                "bestBid": float(data.get("bidPx", 0)),
-                "bestAsk": float(data.get("askPx", 0)),
-                "volume24h": float(data.get("vol24h", 0)),
-                "timestamp": int(data.get("ts", 0))
+                "last": float(data.get("last") or 0),
+                "bestBid": float(data.get("bidPx") or 0),
+                "bestAsk": float(data.get("askPx") or 0),
+                "volume24h": float(data.get("vol24h") or 0),
+                "timestamp": int(data.get("ts") or 0)
             }
         except Exception as e:
             log.error(f"Error normalizing ticker: {e}")
@@ -48,9 +48,9 @@ class DataProcessor:
         """
         try:
             # OKX returns 4 elements: [price, size, liquidated_orders, num_orders]
-            # We only need price and size
-            bids = [[float(p), float(s)] for p, s, *_ in data.get("bids", [])[:20]]
-            asks = [[float(p), float(s)] for p, s, *_ in data.get("asks", [])[:20]]
+            # We only need price and size, handling empty strings safely
+            bids = [[float(p or 0), float(s or 0)] for p, s, *_ in data.get("bids", [])[:20]]
+            asks = [[float(p or 0), float(s or 0)] for p, s, *_ in data.get("asks", [])[:20]]
             
             return {
                 "instId": data.get("instId"),
