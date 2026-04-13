@@ -9,6 +9,11 @@ class OKXClient:
     def __init__(self):
         flag = "1" if Config.OKX_DEMO_TRADING else "0"
         
+        # Explicit validation to prevent cryptic SDK encoding errors
+        if not all([Config.OKX_API_KEY, Config.OKX_SECRET_KEY, Config.OKX_PASSPHRASE]):
+            log.error("CRITICAL: Missing OKX API credentials! Check your .env file or Render Environment Variables.")
+        
+        
         self.tradeAPI = Trade.TradeAPI(
             Config.OKX_API_KEY, 
             Config.OKX_SECRET_KEY, 
