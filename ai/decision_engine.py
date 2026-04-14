@@ -4,11 +4,14 @@ from ai.prompts import PromptGenerator
 from utils.logger import log
 from config import Config
 import asyncio
+import time
 
 class DecisionEngine:
     def __init__(self):
         self.ai_client = DeepSeekClient()
         self.prompt_generator = PromptGenerator()
+        self.loss_cooldowns = {}  # symbol -> timestamp of last loss
+        self.LOSS_COOLDOWN_SECONDS = 1800  # 30 minute cooldown after a loss on a symbol
 
     async def evaluate_market(self, symbol: str, market_data: Dict) -> Optional[Dict]:
         """
@@ -18,6 +21,16 @@ class DecisionEngine:
             # Pre-filter to save AI API costs
             if not self._should_analyze(symbol, market_data):
                 return None
+
+            # Check loss cooldown
+            if symbol in self.loss_cooldowns:
+                elapsed = time.time() - self.loss_cooldowns[symbol]
+                if elapsed < self.LOSS_COOLDOWN_SECONDS:
+                    remaining = int((self.LOSS_COOLDOWN_SECONDS - elapsed) / 60)
+                    log.debug(f"{symbol}: In loss cooldown ({remaining}m remaining). Skipping.")
+                    return None
+                else:
+                    del self.loss_cooldowns[symbol]  # Cooldown expired
 
             # 1. Format data for AI
             prompt = self.prompt_generator.format_market_data(symbol, market_data)
@@ -114,6 +127,25 @@ class DecisionEngine:
                 log.info(f"Signal rejected: Low R/R ratio ({rr_ratio:.2f})")
                 return False
 
+            # Rule 3: Multi-Timeframe Trend Alignment
+            # The higher timeframes (15m, 1H) must not oppose the trade direction
+            indicators_by_tf = market_data.get('indicators', {})
+            higher_tfs = ['15m', '1H']
+            opposing_count = 0
+            for tf in higher_tfs:
+                tf_ind = indicators_by_tf.get(tf, {})
+                if not tf_ind:
+                    continue
+                trend = tf_ind.get('trend', 'NEUTRAL')
+                if action == 'BUY' and trend == 'BEARISH':
+                    opposing_count += 1
+                elif action == 'SELL' and trend == 'BULLISH':
+                    opposing_count += 1
+            
+            if opposing_count >= 2:
+                log.info(f"Signal rejected: Both higher timeframes oppose {action} direction")
+                return False
+
             return True
 
         except Exception as e:
@@ -149,9 +181,24 @@ class DecisionEngine:
             if bb_pos in ['ABOVE_UPPER', 'BELOW_LOWER']:
                 return True
 
+            # Check Volume Spike (latest candle volume > 1.5x previous)
+            candles_data = market_data.get('candles', {})
+            primary_tf_candles = candles_data.get(primary_tf, []) if candles_data else []
+            if len(primary_tf_candles) >= 2:
+                last_vol = primary_tf_candles[-1].get('volume', 0)
+                prev_vol = primary_tf_candles[-2].get('volume', 1)
+                if prev_vol > 0 and (last_vol / prev_vol) > 1.5:
+                    log.debug(f"{symbol}: Volume spike detected ({last_vol/prev_vol:.1f}x). Sending to AI.")
+                    return True
+
             log.debug(f"{symbol}: Pre-filter failed (no momentum). Skipping AI analysis to save credits.")
             return False
             
         except Exception as e:
             log.error(f"Error in pre-filter for {symbol}: {e}")
             return True # Fail open to let AI decide
+
+    def register_loss(self, symbol: str):
+        """Call this when a trade on a symbol results in a loss to activate cooldown."""
+        self.loss_cooldowns[symbol] = time.time()
+        log.info(f"{symbol}: Loss cooldown activated for {self.LOSS_COOLDOWN_SECONDS // 60} minutes.")
