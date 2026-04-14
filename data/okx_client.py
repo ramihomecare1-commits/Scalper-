@@ -193,14 +193,13 @@ class OKXClient:
         Returns a dictionary mapping instId to a dictionary of specs.
         """
         try:
-            # We use the MarketAPI to fetch public instrument rules
-            # We enforce flag=0 (Mainnet) behind the scenes by using a direct Mainnet client 
-            # if we are in DEMO mode, because DEMO mode API might hide newer coins' specifications
-            # but we need specs regardless to round correctly before doing a place_order (which fails safely)
+            import requests
+            url = f"https://www.okx.com/api/v5/public/instruments?instType={instType}"
             
-            # Since OKX python SDK makes it tricky to flip flags on the fly, 
-            # we will just use the configured one, it usually returns public instruments fine.
-            result = self.marketAPI.get_instruments(instType=instType)
+            # Fetch public instrument rules natively
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            result = response.json()
             
             specs = {}
             if isinstance(result, dict) and result.get("code") == "0":
