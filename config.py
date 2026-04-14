@@ -8,7 +8,7 @@ load_dotenv()
 try:
     print("----- CONFIG DEBUG INFO -----")
     print(f"API_KEY present: {bool(os.getenv('OKX_API_KEY'))} (len {len(os.getenv('OKX_API_KEY', ''))})")
-    print(f"SECRET_KEY present: {bool(os.getenv('OKX_SECRET_KEY'))} (len {len(os.getenv('OKX_SECRET_KEY', ''))})")
+    print(f"SECRET_KEY present: {bool(os.getenv('OKX_SECRET_KEY') or os.getenv('OKX_API_SECRET'))}")
     print(f"PASSPHRASE present: {bool(os.getenv('OKX_PASSPHRASE'))} (len {len(os.getenv('OKX_PASSPHRASE', ''))})")
     print("-----------------------------")
 except Exception:
@@ -23,7 +23,7 @@ class Config:
 
     # OKX API Configuration
     OKX_API_KEY = os.getenv("OKX_API_KEY")
-    OKX_SECRET_KEY = os.getenv("OKX_SECRET_KEY")
+    OKX_SECRET_KEY = os.getenv("OKX_SECRET_KEY") or os.getenv("OKX_API_SECRET")
     OKX_PASSPHRASE = os.getenv("OKX_PASSPHRASE")
     # Use OKX Demo Trading URL by default for safety
     OKX_DEMO_TRADING = os.getenv("OKX_DEMO_TRADING", "True").lower() == "true"
