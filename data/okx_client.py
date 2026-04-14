@@ -10,8 +10,13 @@ class OKXClient:
         flag = "1" if Config.OKX_DEMO_TRADING else "0"
         
         # Explicit validation to prevent cryptic SDK encoding errors
-        if not all([Config.OKX_API_KEY, Config.OKX_SECRET_KEY, Config.OKX_PASSPHRASE]):
-            log.error("CRITICAL: Missing OKX API credentials! Check your .env file or Render Environment Variables.")
+        missing_keys = []
+        if not Config.OKX_API_KEY: missing_keys.append("OKX_API_KEY")
+        if not Config.OKX_SECRET_KEY: missing_keys.append("OKX_SECRET_KEY")
+        if not Config.OKX_PASSPHRASE: missing_keys.append("OKX_PASSPHRASE")
+        
+        if missing_keys:
+            log.error(f"CRITICAL: Missing OKX details: {', '.join(missing_keys)}. Check your .env file or Render variables.")
         
         
         self.tradeAPI = Trade.TradeAPI(
