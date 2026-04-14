@@ -4,6 +4,16 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# DEBUG PRINTER FOR RENDER ENVIRONMENT HELP
+try:
+    print("----- CONFIG DEBUG INFO -----")
+    print(f"API_KEY present: {bool(os.getenv('OKX_API_KEY'))} (len {len(os.getenv('OKX_API_KEY', ''))})")
+    print(f"SECRET_KEY present: {bool(os.getenv('OKX_SECRET_KEY'))} (len {len(os.getenv('OKX_SECRET_KEY', ''))})")
+    print(f"PASSPHRASE present: {bool(os.getenv('OKX_PASSPHRASE'))} (len {len(os.getenv('OKX_PASSPHRASE', ''))})")
+    print("-----------------------------")
+except Exception:
+    pass
+
 class Config:
     # System Configuration
     ENV = os.getenv("ENV", "development")
