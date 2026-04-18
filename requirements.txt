@@ -3,7 +3,7 @@ python-dotenv==1.0.0
 loguru==0.7.2
 
 # Data processing - Python 3.13 compatible
-numpy==2.0.2
+numpy==1.26.4
 pandas==2.2.1
 
 # OKX SDK
