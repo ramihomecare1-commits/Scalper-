@@ -4,6 +4,7 @@ loguru==0.7.2
 
 # Data processing - Python 3.13 compatible
 numpy==2.0.2
+pandas==2.2.1
 
 # OKX SDK
 python-okx==0.4.0
