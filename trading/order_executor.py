@@ -8,11 +8,13 @@ from risk.position_monitor import position_monitor
 from notifications.telegram_notifier import TelegramNotifier
 from config import Config
 from utils.logger import log
+from monitoring.trade_logger import TradeLogger
 
 class OrderExecutor:
     def __init__(self):
         self.client = OKXClient()
         self.telegram = TelegramNotifier()
+        self.trade_logger = TradeLogger()
         self.active_trades = {}  # Local tracking, augmented by position_monitor
         self.monitor_task = None
 
@@ -107,22 +109,26 @@ class OrderExecutor:
                 log.info(f"✅ Order Executed: {order_id}")
                 
                 trade_data = {
+                    'trade_id': order_id,
                     'symbol': symbol,
                     'action': action,
-                    'direction': direction,
-                    'entry_price': entry_price,
-                    'stop_loss': stop_loss,
-                    'take_profit': take_profit,
-                    'size': sz,
+                    'side': direction,
+                    'price': entry_price,
+                    'quantity': sz,
                     'risk_reward': signal.get('risk_reward', Config.RISK_REWARD_RATIO),
                     'confidence': signal.get('confidence', 'N/A'),
-                    'reasoning': signal.get('reasoning', 'AI Risk-Managed Entry')
+                    'reasoning': signal.get('reasoning', 'AI Risk-Managed Entry'),
+                    'market_snapshot': market_data,
+                    'ai_analysis': signal.get('ai_analysis', {})
                 }
                 
                 self.active_trades[order_id] = {
                     **trade_data,
                     'entry_time': asyncio.get_event_loop().time()
                 }
+                
+                # Log entry
+                self.trade_logger.log_entry(trade_data)
                 
                 await self.telegram.notify_trade_opened(trade_data)
                 return True
@@ -173,7 +179,8 @@ class OrderExecutor:
             duration = f"{duration_seconds // 60} minutes" if duration_seconds >= 60 else f"{duration_seconds} seconds"
             
             close_data = {
-                **trade,
+                'trade_id': order_id,
+                'symbol': trade.get('symbol'),
                 'exit_price': exit_price,
                 'pnl': pnl,
                 'pnl_percent': pnl_percent,
@@ -182,7 +189,10 @@ class OrderExecutor:
                 'win_rate': 'N/A'
             }
             
-            await self.telegram.notify_trade_closed(close_data)
+            # Log exit
+            self.trade_logger.log_exit(close_data)
+            
+            await self.telegram.notify_trade_closed({**trade, **close_data})
             
             # Record result in Portfolio Risk Manager for drawdown tracking
             portfolio_risk_manager.record_trade_result(pnl)

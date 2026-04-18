@@ -3,6 +3,7 @@ from collections import deque
 from config import Config
 from utils.logger import log
 from data.data_processor import DataProcessor
+import pandas as pd
 
 class MultiTimeframeManager:
     def __init__(self):
@@ -83,6 +84,24 @@ class MultiTimeframeManager:
             "px": px,
             "ts": int(time.time() * 1000)
         })
+
+
+    def get_as_df(self, symbol: str, timeframe: str) -> pd.DataFrame:
+        """Get candle data as a pandas DataFrame"""
+        if symbol not in self.data or timeframe not in self.data[symbol]:
+            return pd.DataFrame()
+            
+        candles = list(self.data[symbol][timeframe])
+        if not candles:
+            return pd.DataFrame()
+            
+        df = pd.DataFrame(candles)
+        # Convert numeric columns
+        cols = ['open', 'high', 'low', 'close', 'volume']
+        df[cols] = df[cols].apply(pd.to_numeric)
+        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+        
+        return df
 
     def get_consolidated_state(self, symbol: str) -> Dict:
         """

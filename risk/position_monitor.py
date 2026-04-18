@@ -4,6 +4,7 @@ from data.okx_client import OKXClient
 from risk.portfolio_risk import portfolio_risk_manager
 from utils.logger import log
 from config import Config
+from monitoring.equity_tracker import EquityTracker
 
 class PositionMonitor:
     """
@@ -12,6 +13,7 @@ class PositionMonitor:
     """
     def __init__(self, client: Optional[OKXClient] = None):
         self.client = client or OKXClient()
+        self.equity_tracker = EquityTracker()
         self.positions = []
         self._last_sync_time = 0
         self._sync_interval = 5  # Seconds between syncs
@@ -39,6 +41,7 @@ class PositionMonitor:
             total_equity = acct_summary.get('total_equity', 0)
             
             if total_equity > 0:
+                self.equity_tracker.record_equity(total_equity)
                 health_ok, message = portfolio_risk_manager.check_portfolio_health(total_equity, self.positions)
                 if not health_ok:
                     log.critical(f"Portfolio health check failed: {message}")
