@@ -1,6 +1,6 @@
 version: 1
 services:
-  - type: worker
+  - type: web
     name: scalper-bot
     env: python
     runtime: python
