@@ -11,19 +11,51 @@ class PromptGenerator:
         try:
             prompt_parts = [f"Analyze {symbol} for a scalping opportunity:"]
             
-            # 1. Current Market State
+            # 1. Market Regime & State
             ticker = data['market_data']['ticker']
             ob = data['market_data'].get('orderbook_analysis', {})
+            regime = data.get('regime', {})
             
+            prompt_parts.append(f"\n--- MARKET REGIME ---")
+            prompt_parts.append(f"State: {regime.get('regime', 'NEUTRAL')} ({regime.get('sub_type', 'SIDEWAYS')})")
+            prompt_parts.append(f"Confidence: {regime.get('confidence', 0):.2f}")
+
             prompt_parts.append(f"\n--- CURRENT STATE ---")
             prompt_parts.append(f"Price: {ticker.get('last')}")
-            prompt_parts.append(f"24h Vol: {ticker.get('volume24h')}")
             
-            if 'imbalance' in ob:
-                prompt_parts.append(f"OB Imbalance: {ob.get('imbalance'):.2f} (-1=sell, +1=buy)")
-                prompt_parts.append(f"Support: {ob.get('nearest_support')}")
-                prompt_parts.append(f"Resistance: {ob.get('nearest_resistance')}")
-                prompt_parts.append(f"Spread: {ob.get('spread')}")
+            if 'imbalance_10' in ob:
+                prompt_parts.append(f"OB Imbalance (10): {ob.get('imbalance_10'):.2f} (-1=sell, +1=buy)")
+                prompt_parts.append(f"OB Imbalance (20): {ob.get('imbalance_20'):.2f}")
+                prompt_parts.append(f"Micro-Price: {ob.get('micro_price'):.2f}")
+                prompt_parts.append(f"Total Liq (Bids/Asks): {ob.get('total_bid_liq')}/{ob.get('total_ask_liq')}")
+                prompt_parts.append(f"S/R: {ob.get('nearest_support')} / {ob.get('nearest_resistance')}")
+                prompt_parts.append(f"Spread: {ob.get('spread')} ({ob.get('spread_pct'):.3f}%)")
+
+            # Sentiment Data
+            sentiment = data['market_data'].get('sentiment', {})
+            liquidations = data['market_data'].get('liquidations', [])
+            
+            if sentiment:
+                prompt_parts.append(f"\n--- SENTIMENT & FLOW ---")
+                if 'funding_rate' in sentiment:
+                    fr = sentiment['funding_rate'].get('fundingRate', 0) * 100
+                    prompt_parts.append(f"Funding Rate: {fr:.4f}%")
+                
+                if 'long_short_ratio' in sentiment:
+                    ls = sentiment['long_short_ratio']
+                    prompt_parts.append(f"Long/Short Ratio: {ls.get('longPct', 50)}% / {ls.get('shortPct', 50)}%")
+                
+                if 'taker_volume' in sentiment:
+                    tv = sentiment['taker_volume']
+                    prompt_parts.append(f"Taker Buy Ratio: {tv.get('buyRatio', 0.5):.2f}")
+                
+                if 'binance_ticker' in sentiment:
+                    bin_last = sentiment['binance_ticker'].get('last', 0)
+                    okx_last = ticker.get('last', 0)
+                    if bin_last > 0 and okx_last > 0:
+                        spread = okx_last - bin_last
+                        spread_pct = (spread / okx_last) * 100
+                        prompt_parts.append(f"OKX-Binance Spread: {spread_pct:+.3f}%")
 
             # 2. Technical Indicators per Timeframe
             prompt_parts.append(f"\n--- INDICATORS ---")
@@ -34,27 +66,23 @@ class PromptGenerator:
                     
                 prompt_parts.append(f"\n[{tf}]")
                 prompt_parts.append(f"RSI: {indicators.get('rsi', 'N/A'):.1f}")
-                prompt_parts.append(f"Trend (MA5/10): {indicators.get('trend', 'N/A')}")
-                prompt_parts.append(f"BB: {indicators.get('bb_position', 'N/A')}")
+                prompt_parts.append(f"ADX: {indicators.get('adx', 0):.1f} ({indicators.get('trend', 'NEUTRAL')})")
+                
+                # Ichimoku
+                if 'ichimoku_signal' in indicators:
+                    prompt_parts.append(f"Ichimoku: {indicators.get('ichimoku_pvcloud', 'N/A')} Cloud ({indicators.get('ichimoku_signal', 'NEUTRAL')})")
+
+                prompt_parts.append(f"BB Pos: {indicators.get('bb_position', 'N/A')} (Bandwidth: {indicators.get('bb_bandwidth', 0):.4f})")
                 prompt_parts.append(f"VWAP Dist: {indicators.get('vwap_dist', 0):.2f}%")
+                prompt_parts.append(f"MACD Hist: {indicators.get('macd_histogram', 0):.4f} ({indicators.get('macd_crossover', 'NONE')})")
                 
-                # MACD
-                prompt_parts.append(f"MACD: {indicators.get('macd', 0):.4f}, Signal: {indicators.get('macd_signal', 0):.4f}, Crossover: {indicators.get('macd_crossover', 'NONE')}")
+                # ATR
+                atr_pct = indicators.get('atr_pct', 0)
+                if atr_pct > 0:
+                    prompt_parts.append(f"Volatility (ATR%): {atr_pct:.2f}%")
                 
-                # ATR (volatility)
-                atr = indicators.get('atr', 0)
-                if atr > 0:
-                    current_price = ticker.get('last', 0)
-                    atr_pct = (atr / current_price * 100) if current_price else 0
-                    prompt_parts.append(f"ATR: {atr:.2f} ({atr_pct:.2f}% of price)")
-                
-                # Volume change
-                candles = data['candles'].get(tf, [])
-                if len(candles) >= 2:
-                    last_vol = candles[-1]['volume']
-                    prev_vol = candles[-2]['volume']
-                    vol_change = ((last_vol - prev_vol) / prev_vol * 100) if prev_vol > 0 else 0
-                    prompt_parts.append(f"Vol Change: {vol_change:.1f}%")
+                # Volume
+                prompt_parts.append(f"Vol Ratio: {indicators.get('vol_ratio', 1.0):.2f} ({indicators.get('vol_label', 'AVERAGE')})")
 
             # 3. Recent Price Action (last 5 candles from the primary timeframe)
             primary_tf = list(data.get('candles', {}).keys())[0] if data.get('candles') else None

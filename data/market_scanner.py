@@ -15,9 +15,9 @@ class MarketScanner:
             "EURT", "EUR", "GBP", "JPY", "WETH", "WBTC", "WSOL"
         }
 
-    def get_top_pairs(self, limit: int = 100, inst_type: str = None) -> List[str]:
+    def get_top_pairs(self, limit: int = 30, inst_type: str = None) -> List[str]:
         """
-        Fetch top pairs by 24h volume.
+        Fetch top pairs by 24h volume with quality filters.
         """
         inst_type = inst_type or Config.TRADING_MODE
         log.info(f"Scanning OKX for top {limit} {inst_type} pairs by volume...")
@@ -39,29 +39,42 @@ class MarketScanner:
             for ticker in data.get("data", []):
                 inst_id = ticker.get("instId", "")
                 
-                # We only want pairs quoted in USDT for simplicity and liquidity
+                # We only want pairs quoted in USDT
                 if "-USDT" not in inst_id:
                     continue
                 
-                # Extract the base coin (e.g. BTC from BTC-USDT-SWAP)
+                # Extract the base coin
                 base_coin = inst_id.split("-")[0]
                 if base_coin in self.EXCLUDED_BASE_COINS:
                     continue
                 
+                # Liquidity Filter: Minimum 24h volume in USDT (e.g., 5M USDT)
                 vol24h = float(ticker.get("volCcy24h", 0))
+                if vol24h < 5000000:
+                    continue
                 
+                # Volatility Filter: Ensure there's some movement
+                last = float(ticker.get("last", 0))
+                open24h = float(ticker.get("open24h", 0))
+                if last == 0 or open24h == 0:
+                    continue
+                
+                price_change_pct = abs((last - open24h) / open24h * 100)
+                if price_change_pct < 0.5: # Ignore dead coins
+                    continue
+
                 valid_pairs.append({
                     "instId": inst_id,
                     "vol": vol24h
                 })
             
-            # Sort by 24h quote currency volume descending
+            # Sort by 24h volume descending
             valid_pairs.sort(key=lambda x: x["vol"], reverse=True)
             
             # Take the top 'limit' pairs
             top_symbols = [p["instId"] for p in valid_pairs[:limit]]
             
-            log.info(f"Successfully found top {len(top_symbols)} liquid symbols.")
+            log.info(f"Successfully found top {len(top_symbols)} high-quality liquid symbols.")
             return top_symbols
             
         except Exception as e:

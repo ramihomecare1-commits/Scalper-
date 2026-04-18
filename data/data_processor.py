@@ -43,14 +43,27 @@ class DataProcessor:
     def normalize_orderbook(data: Dict) -> Dict:
         """
         Normalize order book data
-        Returns top 20 bids and asks
+        Returns top 20 bids and asks with liquidation data
         OKX format: [price, size, liquidated_orders, num_orders]
         """
         try:
-            # OKX returns 4 elements: [price, size, liquidated_orders, num_orders]
-            # We only need price and size, handling empty strings safely
-            bids = [[float(p or 0), float(s or 0)] for p, s, *_ in data.get("bids", [])[:20]]
-            asks = [[float(p or 0), float(s or 0)] for p, s, *_ in data.get("asks", [])[:20]]
+            # Extract full data: [price, size, liquidated_orders, num_orders]
+            bids = []
+            for b in data.get("bids", [])[:20]:
+                # Handle potentially empty values
+                price = float(b[0] or 0)
+                size = float(b[1] or 0)
+                liq = float(b[2] or 0) if len(b) > 2 else 0.0
+                orders = int(b[3] or 0) if len(b) > 3 else 0
+                bids.append([price, size, liq, orders])
+
+            asks = []
+            for a in data.get("asks", [])[:20]:
+                price = float(a[0] or 0)
+                size = float(a[1] or 0)
+                liq = float(a[2] or 0) if len(a) > 2 else 0.0
+                orders = int(a[3] or 0) if len(a) > 3 else 0
+                asks.append([price, size, liq, orders])
             
             return {
                 "instId": data.get("instId"),

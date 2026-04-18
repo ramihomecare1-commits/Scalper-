@@ -56,24 +56,43 @@ class StopLossManager:
             return {}
 
     @staticmethod
-    def check_trailing_stop(current_price: float, entry_price: float, side: str, current_sl: float) -> Optional[float]:
+    def check_trailing_stop(current_price: float, entry_price: float, side: str, current_sl: float, atr: float = 0.0) -> Optional[float]:
         """
-        Calculate new trailing stop level if applicable
+        Calculate new trailing stop level if applicable.
+        Includes a minimum move threshold (0.1% or 0.2*ATR) to prevent over-frequent API calls.
         """
         try:
-            trailing_percent = 0.005 # 0.5% trailing
+            # Configurable trailing parameters
+            trailing_percent = float(getattr(Config, 'TRAILING_STOP_PERCENT', 0.005)) # 0.5%
+            min_update_percent = 0.001 # 0.1% minimum move before updating SL again
             
+            # Use ATR for a more dynamic move threshold if available
+            if atr > 0:
+                move_threshold = max(current_price * min_update_percent, atr * 0.2)
+            else:
+                move_threshold = current_price * min_update_percent
+
             if side == "BUY":
-                if current_price > entry_price * (1 + trailing_percent):
-                    new_sl = current_price * (1 - trailing_percent)
-                    if new_sl > current_sl:
-                        return new_sl
+                # Only trail if price is above entry
+                if current_price > entry_price:
+                    # Calculate potential new SL
+                    potential_new_sl = current_price * (1 - trailing_percent)
+                    
+                    # Only move SL up, and only if it's a significant move
+                    if potential_new_sl > current_sl + move_threshold:
+                        log.debug(f"Trailing SL Up: {current_sl} -> {potential_new_sl}")
+                        return potential_new_sl
                         
             elif side == "SELL":
-                if current_price < entry_price * (1 - trailing_percent):
-                    new_sl = current_price * (1 + trailing_percent)
-                    if new_sl < current_sl:
-                        return new_sl
+                # Only trail if price is below entry
+                if current_price < entry_price:
+                    # Calculate potential new SL
+                    potential_new_sl = current_price * (1 + trailing_percent)
+                    
+                    # Only move SL down, and only if it's a significant move
+                    if potential_new_sl < current_sl - move_threshold:
+                        log.debug(f"Trailing SL Down: {current_sl} -> {potential_new_sl}")
+                        return potential_new_sl
                         
             return None
 

@@ -53,6 +53,8 @@ class Config:
     MAX_LOSS_PER_TRADE_PERCENT = float(os.getenv("MAX_LOSS_PER_TRADE_PERCENT", "0.01")) # 1% of account
     RISK_REWARD_RATIO = float(os.getenv("RISK_REWARD_RATIO", "1.5"))
     MAX_CONCURRENT_POSITIONS = int(os.getenv("MAX_CONCURRENT_POSITIONS", "5"))
+    MAX_DAILY_DRAWDOWN_PERCENT = float(os.getenv("MAX_DAILY_DRAWDOWN_PERCENT", "0.05")) # 5% per day
+    MAX_SAME_DIRECTION_POSITIONS = int(os.getenv("MAX_SAME_DIRECTION_POSITIONS", "3")) # Max 3 longs or 3 shorts
     
     # Render / Deployment
     PORT = int(os.getenv("PORT", "10000"))

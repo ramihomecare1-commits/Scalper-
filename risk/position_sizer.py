@@ -1,3 +1,4 @@
+from decimal import Decimal, ROUND_FLOOR
 from config import Config
 from utils.logger import log
 
@@ -5,67 +6,61 @@ class PositionSizer:
     @staticmethod
     def calculate_position_size(account_equity: float, entry_price: float, symbol: str, specs: dict = None) -> float:
         """
-        Calculate OKX-compliant position size based on risk rules and instrument precision
+        Calculate OKX-compliant position size based on risk rules and instrument precision.
         Returns exactly the amount expected for the 'sz' field (contracts for SWAP, or tokens for SPOT).
+        Uses Decimal for high precision to avoid floating point errors.
         """
         try:
             specs = specs or {}
-            lotSz = float(specs.get('lotSz', 1))
-            minSz = float(specs.get('minSz', 1))
-            ctVal = float(specs.get('ctVal', 1))
+            # Defaults to 1.0 but should be fetched from public instruments specs
+            lotSz = Decimal(str(specs.get('lotSz', '1')))
+            minSz = Decimal(str(specs.get('minSz', '1')))
+            ctVal = Decimal(str(specs.get('ctVal', '1')))
             
-            # Rule: 2-3% of total equity per trade
-            position_value_usd = account_equity * getattr(Config, 'POSITION_SIZE_PERCENT', 0.02)
+            # Risk Rule: % of total equity per trade
+            risk_percent = Decimal(str(getattr(Config, 'POSITION_SIZE_PERCENT', '0.02')))
+            position_value_usd = Decimal(str(account_equity)) * risk_percent
             
             # Apply leverage
-            leveraged_value_usd = position_value_usd * getattr(Config, 'LEVERAGE', 3)
+            leverage = Decimal(str(getattr(Config, 'LEVERAGE', '3')))
+            leveraged_value_usd = position_value_usd * leverage
             
             # 1. Calculate raw base currency amount (e.g., 0.5 BTC)
-            raw_base_qty = leveraged_value_usd / entry_price
+            raw_base_qty = leveraged_value_usd / Decimal(str(entry_price))
             
             # 2. Convert to OKX sizing units
             if getattr(Config, 'TRADING_MODE', 'SWAP') == 'SWAP':
-                # For SWAP, size is in contracts.
                 # Number of contracts = Base Quantity / Contract Value
                 raw_size = raw_base_qty / ctVal
             else:
-                # For SPOT, size is in base currency
                 raw_size = raw_base_qty
                 
-            # 3. Round mathematically to nearest lotSz
-            # Avoid divide by zero if lotSz is somehow 0
-            if lotSz > 0:
-                rounded_size = max(minSz, round(raw_size / lotSz) * lotSz)
-            else:
-                rounded_size = raw_size
-                
-            # Formatting precision based on lotSz decimal places
-            # lotSz = 0.01 -> 2 decimals. lotSz = 1 -> 0 decimals.
-            str_lot = str(lotSz)
-            decimals = len(str_lot.split(".")[1]) if "." in str_lot else 0
-            # Remove trailing zeros resulting from float stringification
-            if "e" not in str_lot and decimals > 0:
-                decimals = len(str_lot.rstrip('0').split(".")[1]) if "." in str_lot.rstrip('0') else 0
+            # 3. Round to nearest lotSz (downwards for safety)
+            # Use ROUND_FLOOR to ensure we don't exceed the intended risk margin
+            rounded_size = (raw_size / lotSz).quantize(Decimal('1'), rounding=ROUND_FLOOR) * lotSz
             
-            # Convert to final float reflecting OKX exact requirement
-            final_size = float(f"{rounded_size:.{decimals}f}")
+            # Ensure it's at least minSz
+            final_size = max(minSz, rounded_size)
             
-            log.info(f"Position Sizing: Equity=${account_equity:.2f}, LeveragedValue=${leveraged_value_usd:.2f}, Raw={raw_size:.4f}, OKX Size={final_size} (lotSz={lotSz}, ctVal={ctVal})")
+            # Return as float for the SDK
+            result = float(final_size)
             
-            return final_size
+            log.info(f"Sizing [{symbol}]: Equity={account_equity:.2f}, LeveragedValue=${float(leveraged_value_usd):.2f}, RawUnits={float(raw_size):.6f}, OKX Size={result} (lot={lotSz}, ctVal={ctVal})")
+            
+            return result
 
         except Exception as e:
             log.error(f"Error calculating position size: {e}")
             return 0.0
 
     @staticmethod
-    def check_max_loss(account_equity: float, entry_price: float, stop_loss: float, quantity: float) -> bool:
+    def check_max_loss(account_equity: float, entry_price: float, stop_loss: float, quantity: float, ctVal: float = 1.0) -> bool:
         """
         Verify if potential loss exceeds maximum allowed risk
         """
         try:
             potential_loss_per_unit = abs(entry_price - stop_loss)
-            total_potential_loss = potential_loss_per_unit * quantity
+            total_potential_loss = potential_loss_per_unit * quantity * ctVal
             
             max_allowed_loss = account_equity * Config.MAX_LOSS_PER_TRADE_PERCENT
             

@@ -1,15 +1,19 @@
 import requests
+import backoff
 from typing import List, Dict, Optional
 from config import Config
 from utils.logger import log
+from utils.circuit_breaker import with_circuit_breaker_sync
 
 class OKXMarketData:
     """REST API client for OKX market data"""
     
     def __init__(self):
         # Use demo URL if in demo mode
-        self.base_url = "https://www.okx.com/api/v5" if not Config.OKX_DEMO_TRADING else "https://www.okx.com/api/v5"
+        self.base_url = "https://www.okx.com/api/v5"
         
+    @with_circuit_breaker_sync("OKX_REST")
+    @backoff.on_exception(backoff.expo, (requests.exceptions.RequestException), max_tries=3)
     def get_candles(self, inst_id: str, bar: str = "1m", limit: int = 100) -> List[Dict]:
         """
         Get historical candle data via REST API
@@ -60,6 +64,7 @@ class OKXMarketData:
             log.error(f"Error fetching candles: {e}")
             return []
     
+    @with_circuit_breaker_sync("OKX_REST")
     def get_available_instruments(self, inst_type: str = "SPOT") -> List[str]:
         """
         Get list of available instruments

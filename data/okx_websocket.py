@@ -5,6 +5,8 @@ import websockets
 from typing import List, Dict, Callable, Optional
 from config import Config
 from utils.logger import log
+from utils.circuit_breaker import CircuitBreakerManager
+from utils.health_monitor import health_monitor
 
 class OKXWebSocket:
     def __init__(self):
@@ -16,6 +18,8 @@ class OKXWebSocket:
         self.callbacks: Dict[str, List[Callable]] = {}
         self.subscriptions = []
         self.reconnect_delay = 5
+        self.max_reconnect_delay = 60
+        self.breaker = CircuitBreakerManager.get_breaker("OKX_WS", failure_threshold=3, recovery_timeout=30)
 
     async def connect(self):
         """Establish WebSocket connection"""
@@ -29,6 +33,10 @@ class OKXWebSocket:
             if self.subscriptions:
                 await self._subscribe(self.subscriptions)
                 
+            health_monitor.update_connection_status("okx_ws", True)
+            self.breaker.record_success()
+            self.reconnect_delay = 5 # Reset delay on success
+            
             asyncio.create_task(self._listen())
             asyncio.create_task(self._ping_loop())
             
@@ -55,13 +63,29 @@ class OKXWebSocket:
             await self._reconnect()
 
     async def _reconnect(self):
-        """Handle reconnection logic"""
+        """Handle reconnection logic with exponential backoff and circuit breaker"""
         self.running = False
-        if self.ws:
-            await self.ws.close()
+        health_monitor.update_connection_status("okx_ws", False)
+        self.breaker.record_failure()
         
-        log.warning(f"Reconnecting in {self.reconnect_delay} seconds...")
+        if self.ws:
+            try:
+                await self.ws.close()
+            except:
+                pass
+        
+        if not self.breaker.can_execute():
+            log.warning(f"OKX WS Circuit OPEN. Throttling reconnection attempts.")
+            await asyncio.sleep(self.breaker.recovery_timeout)
+            
+        log.warning(f"Reconnecting OKX WebSocket in {self.reconnect_delay} seconds...")
+        health_monitor.record_reconnect("okx_ws")
+        
         await asyncio.sleep(self.reconnect_delay)
+        
+        # Exponential backoff
+        self.reconnect_delay = min(self.reconnect_delay * 2, self.max_reconnect_delay)
+        
         await self.connect()
 
     async def subscribe(self, channels: List[Dict]):
@@ -96,6 +120,10 @@ class OKXWebSocket:
                 
                 data = json.loads(msg)
                 
+                # Update health monitor
+                health_monitor.update_latency("okx_ws", 0) # Base update
+                self.breaker.record_success() 
+                
                 if "event" in data:
                     if data["event"] == "subscribe":
                         log.debug(f"Subscription confirmed: {data.get('arg')}")
@@ -104,8 +132,8 @@ class OKXWebSocket:
                     continue
 
                 if "data" in data and "arg" in data:
-                    channel = data["arg"]["channel"]
-                    inst_id = data["arg"]["instId"]
+                    channel = data["arg"].get("channel", "")
+                    inst_id = data["arg"].get("instId", "")
                     # Dispatch to callbacks
                     key = f"{channel}:{inst_id}"
                     

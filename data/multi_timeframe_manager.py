@@ -13,6 +13,10 @@ class MultiTimeframeManager:
         self.orderbooks: Dict[str, Dict] = {}
         # Storage for latest ticker: {symbol: data}
         self.tickers: Dict[str, Dict] = {}
+        # Storage for sentiment data: {symbol: {metric_type: data}}
+        self.sentiment: Dict[str, Dict] = {}
+        # Storage for recent liquidations: {symbol: deque(maxlen=50)}
+        self.liquidations: Dict[str, deque] = {}
         
         self.window_size = 100
 
@@ -20,6 +24,8 @@ class MultiTimeframeManager:
         """Initialize storage for a symbol"""
         if symbol not in self.data:
             self.data[symbol] = {tf: deque(maxlen=self.window_size) for tf in self.timeframes}
+            self.sentiment[symbol] = {}
+            self.liquidations[symbol] = deque(maxlen=50)
             log.info(f"Initialized data storage for {symbol}")
 
     def update_candle(self, symbol: str, timeframe: str, raw_candle: List[str]):
@@ -46,6 +52,38 @@ class MultiTimeframeManager:
         """Update ticker data"""
         self.tickers[symbol] = DataProcessor.normalize_ticker(raw_data)
 
+    def update_binance_ticker(self, symbol: str, data: Dict):
+        """Update Binance ticker data for lead/lag (symbol is OKX format, e.g., BTC-USDT-SWAP)"""
+        if symbol not in self.sentiment:
+            self.initialize_symbol(symbol)
+            
+        try:
+            last_price = float(data.get("c", 0))
+            self.sentiment[symbol]["binance_ticker"] = {
+                "last": last_price,
+                "ts": int(data.get("E", 0))
+            }
+        except Exception as e:
+            log.error(f"Error updating Binance ticker: {e}")
+
+    def update_sentiment(self, symbol: str, metric_type: str, data: Dict):
+        """Update sentiment data"""
+        if symbol not in self.sentiment:
+            self.initialize_symbol(symbol)
+        self.sentiment[symbol][metric_type] = data
+        
+    def record_liquidation(self, symbol: str, side: str, sz: float, px: float):
+        """Record a liquidation event"""
+        import time
+        if symbol not in self.liquidations:
+            self.initialize_symbol(symbol)
+        self.liquidations[symbol].append({
+            "side": side,
+            "sz": sz,
+            "px": px,
+            "ts": int(time.time() * 1000)
+        })
+
     def get_consolidated_state(self, symbol: str) -> Dict:
         """
         Get consolidated state for AI analysis
@@ -58,7 +96,9 @@ class MultiTimeframeManager:
             "symbol": symbol,
             "market_data": {
                 "ticker": self.tickers.get(symbol, {}),
-                "orderbook": self.orderbooks.get(symbol, {})
+                "orderbook": self.orderbooks.get(symbol, {}),
+                "sentiment": self.sentiment.get(symbol, {}),
+                "liquidations": list(self.liquidations.get(symbol, []))
             },
             "candles": {}
         }

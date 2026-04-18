@@ -70,6 +70,11 @@ class DeepSeekClient:
                             "75-89 = strong setup with minor concerns. 50-74 = weak/conflicting → HOLD. Below 50 = dangerous → HOLD. "
                             "7. When in doubt, HOLD. Preserving capital beats catching every move. "
                             "8. Orderbook imbalance > 0.3 favors buyers, < -0.3 favors sellers. Use this as confirmation, not primary signal. "
+                            "9. Identify crowded trades using Long/Short Ratio (>65% long is a crowded long). Fade crowded trades if other signals align. "
+                            "10. Look for Open Interest divergence (e.g., price dropping + OI rising means aggressive shorts building). "
+                            "11. Taker Buy Ratio > 0.55 means aggressive buying; < 0.45 means aggressive selling. "
+                            "12. Options Put/Call Ratio > 1.0 means sophisticated traders are hedging against a drop (bearish). "
+                            "13. OKX-Binance Spread is crucial for lead/lag. A large negative spread means Binance price is much higher and leading UP (bullish). A large positive spread means Binance is lower and leading DOWN (bearish). "
                             "Respond with ONLY valid JSON. No markdown, no explanation outside the JSON object."
                         )
                     },

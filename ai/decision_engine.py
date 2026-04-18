@@ -103,9 +103,29 @@ class DecisionEngine:
             if action == "HOLD":
                 return False
 
-            # Rule 1: Confidence Check
-            if decision.get("confidence", 0) < 75:
-                log.info(f"Signal rejected: Low confidence ({decision.get('confidence')})")
+            # Rule 1: Confidence Check (Dynamic based on volatility)
+            # Higher confidence needed in low volatility environments
+            min_confidence = 75
+            
+            # Try to determine market volatility via ATR (as % of price)
+            try:
+                primary_tf = list(market_data.get('indicators', {}).keys())[0] if market_data.get('indicators') else None
+                if primary_tf:
+                    atr = market_data['indicators'][primary_tf].get('atr', 0)
+                    current_price = market_data.get('market_data', {}).get('ticker', {}).get('last', 0)
+                    if atr > 0 and current_price > 0:
+                        atr_pct = (atr / current_price) * 100
+                        # If ATR is very low (<0.1%), market is choppy/tight. Demand high confidence.
+                        if atr_pct < 0.1:
+                            min_confidence = 85
+                        # If ATR is high (>0.5%), market is moving well. Allow lower confidence.
+                        elif atr_pct > 0.5:
+                            min_confidence = 70
+            except Exception as e:
+                log.debug(f"Could not calculate dynamic confidence threshold: {e}")
+                
+            if decision.get("confidence", 0) < min_confidence:
+                log.info(f"Signal rejected: Confidence ({decision.get('confidence')}) below dynamic threshold ({min_confidence})")
                 return False
 
             # Rule 2: Risk/Reward Check
@@ -176,6 +196,12 @@ class DecisionEngine:
             if macd_crossover != 'NONE':
                 return True
                 
+            # Check ADX for strong trend (> 25)
+            adx = ind.get('adx', 0)
+            if adx > 25:
+                # In strong trends, we want to look for continuations
+                return True
+                
             # Check Bollinger Bands (price near edges)
             bb_pos = ind.get('bb_position', 'LOWER_HALF')
             if bb_pos in ['ABOVE_UPPER', 'BELOW_LOWER']:
@@ -191,7 +217,49 @@ class DecisionEngine:
                     log.debug(f"{symbol}: Volume spike detected ({last_vol/prev_vol:.1f}x). Sending to AI.")
                     return True
 
-            log.debug(f"{symbol}: Pre-filter failed (no momentum). Skipping AI analysis to save credits.")
+            # Check Sentiment Signals
+            sentiment = market_data.get('market_data', {}).get('sentiment', {})
+            if sentiment:
+                # Binance Lead/Lag frontrunning (Abrupt spread divergence > 0.1%)
+                if 'binance_ticker' in sentiment:
+                    bin_last = sentiment['binance_ticker'].get('last', 0)
+                    okx_last = market_data.get('market_data', {}).get('ticker', {}).get('last', 0)
+                    if bin_last > 0 and okx_last > 0:
+                        spread_pct = abs((okx_last - bin_last) / okx_last) * 100
+                        if spread_pct > 0.1:
+                            log.warning(f"{symbol}: Massive OKX/Binance spread ({spread_pct:.3f}%). Front-run trigger!")
+                            return True
+
+                # Extreme funding rates
+                if 'funding_rate' in sentiment:
+                    fr = sentiment['funding_rate'].get('fundingRate', 0)
+                    if abs(fr) > 0.0005:  # > 0.05% per period is quite high
+                        log.debug(f"{symbol}: Extreme funding rate ({fr*100:.3f}%). Sending to AI.")
+                        return True
+                
+                # Crowded trades
+                if 'long_short_ratio' in sentiment:
+                    ls = sentiment['long_short_ratio']
+                    if ls.get('longPct', 50) > 70 or ls.get('shortPct', 50) > 70:
+                        log.debug(f"{symbol}: Crowded L/S ratio. Sending to AI.")
+                        return True
+                
+                # Hedge positioning (Put/Call > 1.2)
+                if 'put_call_ratio' in sentiment:
+                    pc = sentiment['put_call_ratio'].get('putCallRatio', 1.0)
+                    if pc > 1.2:
+                        log.debug(f"{symbol}: High Put/Call Ratio ({pc:.2f}). Sending to AI.")
+                        return True
+                
+                # Aggressive taker flow
+                if 'taker_volume' in sentiment:
+                    tv = sentiment['taker_volume']
+                    br = tv.get('buyRatio', 0.5)
+                    if br > 0.6 or br < 0.4:
+                        log.debug(f"{symbol}: Aggressive taker flow (Buy Ratio {br:.2f}). Sending to AI.")
+                        return True
+
+            log.debug(f"{symbol}: Pre-filter failed (no momentum/sentiment). Skipping AI analysis to save credits.")
             return False
             
         except Exception as e:

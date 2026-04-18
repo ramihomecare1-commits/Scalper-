@@ -5,7 +5,8 @@ services:
     env: python
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python bot.py
+    startCommand: python web.py # Start web.py which starts bot.py in a thread
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
